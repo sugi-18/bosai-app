@@ -116,6 +116,24 @@ export async function signIn(email, password) {
   return data;
 }
 
+/** 現在のログイン状態を取得（画面起動時に呼ぶ） */
+export async function getSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+/** ログイン状態の変化を監視する。戻り値を呼ぶと監視を解除 */
+export function onAuthChange(callback) {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => callback(session));
+  return () => data.subscription.unsubscribe();
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
 /** 自分が管理する自治会 */
 export async function getMyAssociations() {
   const { data, error } = await supabase
