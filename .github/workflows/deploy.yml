@@ -1,17 +1,11 @@
 # .github/workflows/deploy.yml
-#
-# main ブランチに push するたびに、自動でビルドして GitHub Pages に公開します。
-# 事前に必要な設定は2つ：
-#   1. Settings → Pages → Source を「GitHub Actions」にする
-#   2. Settings → Secrets and variables → Actions に
-#      VITE_SUPABASE_URL と VITE_SUPABASE_ANON_KEY を登録する
 
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # Actions タブから手動実行もできる
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,6 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: ソースコードを取得
         uses: actions/checkout@v4
@@ -33,10 +28,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: 依存パッケージをインストール
-        run: npm ci
+        run: npm install
 
       - name: ビルド
         run: npm run build
@@ -55,9 +49,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: 公開
         id: deployment
