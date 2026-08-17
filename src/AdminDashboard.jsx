@@ -19,6 +19,7 @@ import {
   getMyAssociations, getRoundSummaries, getItemAverages, getTotalsByAttribute,
   getItemMaster, createRound, setRoundStatus,
 } from "./lib/bosai-supabase-api";
+import PaperEntry from "./PaperEntry";
 
 /* ============================================================
    定数・補助
@@ -636,6 +637,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
               </>
             )}
 
+            <PaperEntry association={association} rounds={rounds} master={master} onSaved={loadRounds} />
             <RoundManager association={association} rounds={rounds} onChanged={loadRounds} />
           </>
         )}
