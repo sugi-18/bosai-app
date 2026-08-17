@@ -70,8 +70,8 @@
 
 公開されたURLはこうなります。
 
-- 回答画面：`https://<あなたのID>.github.io/bosai-app/?code=ABC123`
-- 管理画面：`https://<あなたのID>.github.io/bosai-app/admin.html`
+- 回答画面：`https://sugi-18.github.io/bosai-app/?code=iwase2026`
+- 管理画面：`https://sugi-18.github.io/bosai-app/admin.html`
 
 `ABC123` の部分は、SETUP.md の 1-3 で決めた合言葉（`access_code`）に置き換えてください。
 
