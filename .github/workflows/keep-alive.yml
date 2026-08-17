@@ -1,0 +1,34 @@
+# .github/workflows/keep-alive.yml
+#
+# Supabase の無料プランは、1週間アクセスが無いとプロジェクトを一時停止します。
+# 年1回しか使わない調査システムでは、次の調査のときに必ず止まっています。
+# このワークフローは週2回、設問マスタを1件読むだけのリクエストを送り、
+# 「使われている」状態を保ちます。データは何も書き換えません。
+#
+# 注意：GitHub は 60日間コミットが無いリポジトリの定期実行を自動停止します。
+#       2か月に1回は何かコミットするか、Actions タブの「Enable workflow」を
+#       押し直してください。
+
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '0 3 * * 1,4'   # 毎週 月曜・木曜 03:00 UTC（日本時間 正午）
+  workflow_dispatch:        # 手動実行で動作確認できる
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 設問マスタを1件読む
+        run: |
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/item_master?select=item_no&limit=1" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}")
+          echo "HTTPステータス: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Supabase への接続に失敗しました。プロジェクトが停止中か、Secrets の値が誤っている可能性があります。"
+            exit 1
+          fi
+          echo "Supabase は稼働しています。"
