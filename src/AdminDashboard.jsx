@@ -1,212 +1,682 @@
-import React, { useState, useMemo } from "react";
+/**
+ * 地域防災力評価システム / 管理・集計画面（Supabase接続版）
+ *
+ * 置き場所： src/AdminDashboard.jsx
+ *
+ * ★ import のパスについて
+ *   src/lib/bosai-supabase-api.js に置いている場合 → 下記のまま
+ *   src/bosai-supabase-api.js に置いている場合   → "./lib/..." から "./..." に直す
+ *   BosaiSurvey.jsx の import 行と同じ書き方に揃えてください。
+ */
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ResponsiveContainer, Legend, Tooltip, Cell, ReferenceLine,
 } from "recharts";
+import {
+  signIn, signOut, getSession, onAuthChange,
+  getMyAssociations, getRoundSummaries, getItemAverages, getTotalsByAttribute,
+  getItemMaster, createRound, setRoundStatus,
+} from "./lib/bosai-supabase-api";
 
 /* ============================================================
-   地域防災力評価システム / 自治会向け 管理・集計ダッシュボード
-   Supabase の集計ビュー（v_round_summary / v_item_averages /
-   v_item_trend / v_respondent_totals）を読む前提の画面です。
-   この試作では、下の loadRounds() が返すデータを差し替えるだけで
-   実データに接続できます。
+   定数・補助
    ============================================================ */
-
-/* ---------- 項目マスタ（DBの item_master と同じ内容） ---------- */
-const K = (no, cat, label, type, tip) => ({ section: "koudou", no, cat, label, type, tip });
-const S = (no, cat, label, type, tip) => ({ section: "shodou", no, cat, label, type, tip });
-
-const KOUDOU = [
-  K(1, "被害拡大防止", "家具転倒防止措置", "c3", "寝室と居間の背の高い家具から順に、L字金具や突っ張り棒で固定する"),
-  K(2, "被害拡大防止", "住宅用火災警報器の設置", "c3", "寝室と階段上部の設置状況を確認し、未設置の部屋に追加する"),
-  K(3, "被害拡大防止", "住宅用火災警報器の点検・電池交換", "c3", "年1回まとめて点検する日を決め、設置10年経過品は本体ごと交換する"),
-  K(4, "被害拡大防止", "感震ブレーカーの設置", "c2", "分電盤タイプまたは簡易タイプの感震ブレーカーを設置し、通電火災を防ぐ"),
-  K(5, "被害拡大防止", "家庭用消火器等の設置（使用期限確認）", "c2", "住宅用消火器を1本備え、使用期限を確認する"),
-  K(6, "備蓄状況", "食料品（日常備蓄：3日分目安）", "c3", "普段食べる食品を多めに買い、古い順に使うローリングストックに切り替える"),
-  K(7, "備蓄状況", "飲料水（日常備蓄：3日分目安）", "c3", "1人1日3L×3日分（9L）を目安に、箱買いして玄関近くに置く"),
-  K(8, "備蓄状況", "生活用品（日常備蓄：3日分目安）", "c3", "携帯トイレ・ラジオ・乾電池・常備薬など、水と食料以外の3日分をそろえる"),
-  K(9, "備蓄状況", "非常用持出セット", "c2", "持ち出し用リュックを玄関に置き、年1回中身を入れ替える"),
-  K(10, "連絡体制", "災害時の家族集合場所の決定", "c2", "一次集合場所と広域避難場所の2か所を家族で決め、紙に書いて全員が持つ"),
-  K(11, "連絡体制", "家族それぞれの避難場所・避難ルートの把握", "c2", "日中の居場所からの避難ルートを、家族で一度歩いて確認する"),
-  K(12, "連絡体制", "家庭内の連絡手段の確保", "c2", "災害用伝言ダイヤル171を、体験利用日に家族で試す"),
-  K(13, "連絡体制", "防災個別計画（マイ・タイムライン）の作成", "c2", "自治会でマイ・タイムライン作成講座を開き、その場で1枚仕上げる"),
-  K(14, "知識習得", "防災関連の研修会、講演会等への参加", "c2", "市区町村や消防署の講演会情報を回覧・掲示板で毎回共有する"),
-  K(15, "知識習得", "防災関連知識の自発的学習", "c2", "ハザードマップと地区防災計画を読む機会を、広報や回覧でつくる"),
-  K(16, "知識習得", "防災関連イベントや体験学習施設等への参加", "c2", "防災体験施設への地域見学会を企画し、家族参加型にする"),
-  K(17, "地域防災活動", "地域の防災訓練への参加", "c2", "日程を早期に周知し、短時間・出入り自由の形式を用意する"),
-  K(18, "地域防災活動", "地域の防災勉強会・意見交換会への参加", "c2", "班単位の少人数意見交換会を年1回開き、発言しやすい場にする"),
-  K(19, "地域防災活動", "避難所運営に対する意識", "c3", "避難所運営ゲーム（HUG）等で役割を体験し、担当者を事前に決めておく"),
-  K(20, "地域防災活動", "発災時の自治会活動内容の把握", "c3", "発災時の自治会の役割分担表を1枚にまとめ、全戸配布する"),
-];
-
-const SHODOU = [
-  S(1, "避難", "防災訓練（避難）への参加", "c2", "避難訓練の日程を複数設定し、参加しやすい時間帯を用意する"),
-  S(2, "避難", "近隣の避難場所、避難ルートの把握", "c3", "避難場所とルートを地図にして全戸配布し、実際に歩く機会を設ける"),
-  S(3, "避難", "近隣の要支援者の把握", "c3", "班ごとに要支援者名簿を整備し、支援担当を事前に割り当てる"),
-  S(4, "避難", "近隣の要支援者の支援", "c3", "要支援者ごとの個別避難計画を作り、避難支援訓練で実際に動いてみる"),
-  S(5, "避難", "地域の発災時の取り決め内容の把握", "c3", "安否確認の方法や集合順序など、地域ルールを1枚にまとめて配布する"),
-  S(6, "避難", "地域の発災時の取り決め内容の実行", "c3", "安否確認（タオル掲示等）の合図を、実際に全戸で試す訓練を行う"),
-  S(7, "避難", "地域の防災倉庫の位置・備品の把握", "c3", "防災倉庫の場所と備品リストを公開し、点検作業を住民参加型にする"),
-  S(8, "消火", "防災訓練（消火）への参加", "c2", "消火訓練を短時間の体験型にし、当日参加もできるようにする"),
-  S(9, "消火", "消火器使用訓練の実施", "c2", "水消火器を使った実技訓練を年1回、全班で実施する"),
-  S(10, "消火", "消火器の使用", "c3", "ピン・ホース・レバーの3動作を、全員が一度は自分の手で体験する"),
-  S(11, "消火", "消火用資機材（消火器以外）の使用方法", "c3", "スタンドパイプや可搬ポンプの使用方法を訓練メニューに加える"),
-  S(12, "消火", "消火についての基礎知識", "q", "消火栓・防火水槽の位置と、初期消火か避難かの判断基準を学ぶ機会をつくる"),
-  S(13, "救出救助", "防災訓練（救出救助）への参加", "c2", "救出救助を訓練メニューに追加し、まず見学だけでも参加できる形にする"),
-  S(14, "救出救助", "救助用資機材（ジャッキ・バール）使用訓練の実施", "c2", "消防署の協力を得て、ジャッキ・バールの使用訓練を実施する"),
-  S(15, "救出救助", "救助用資機材（ジャッキ・バール）の使用", "c3", "資機材の保管場所を周知し、班ごとに複数名が扱えるようにする"),
-  S(16, "救出救助", "救出救助についての基礎知識", "q", "危険箇所の把握、テコの原理、クラッシュ症候群を扱う講習を行う"),
-  S(17, "応急救護", "防災訓練（応急救護）への参加", "c2", "普通救命講習を地域単位で受講できるよう、消防署と日程調整する"),
-  S(18, "応急救護", "AED使用訓練の実施", "c2", "AED実技を含む救命講習を年1回、地域で開催する"),
-  S(19, "応急救護", "AEDの使用", "c3", "地域内のAED設置場所マップを作り、実機で操作を体験する"),
-  S(20, "応急救護", "応急救護についての基礎知識", "q", "胸骨圧迫・止血・三角巾の基本を扱う短時間講習を行う"),
-];
-
 const K_CATS = ["被害拡大防止", "備蓄状況", "連絡体制", "知識習得", "地域防災活動"];
 const S_CATS = ["避難", "消火", "救出救助", "応急救護"];
-const AGES = ["40代", "50代", "60代", "70代", "80代以上"];
+const AGES = ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
 
-/* ---------- 第1回：実データ（役員・区長27名） ---------- */
-const R1_K = [
-  [2.5,2.5,0,0,2.5,5,2.5,2.5,5,2.5,2.5,2.5,2.5,0,0,0,0,0,2.5,2.5,2.5,2.5,0,2.5,0,0,5],
-  [0,5,0,2.5,0,5,2.5,2.5,5,0,2.5,5,5,5,0,0,0,5,0,5,5,0,5,5,5,5,5],
-  [0,5,0,2.5,0,5,0,2.5,2.5,0,5,5,0,2.5,0,0,0,5,0,2.5,5,0,2.5,0,2.5,5,5],
-  [0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,0,5,0,5,5,0,5,0,5,5,0],
-  [0,5,0,0,0,5,0,5,0,0,5,0,5,0,5,0,0,5,0,5,0,0,5,0,0,5,0],
-  [5,5,2.5,2.5,0,5,0,2.5,5,0,5,5,5,2.5,2.5,2.5,2.5,5,2.5,2.5,5,5,2.5,2.5,5,0,0],
-  [5,5,2.5,2.5,0,5,0,2.5,5,5,5,5,5,2.5,2.5,2.5,2.5,5,0,2.5,5,2.5,0,2.5,5,0,5],
-  [0,5,2.5,2.5,0,2.5,0,2.5,5,0,5,2.5,2.5,2.5,2.5,2.5,2.5,5,0,2.5,5,0,2.5,2.5,5,0,0],
-  [0,5,0,0,0,5,5,0,0,0,0,0,0,5,5,0,0,5,0,5,5,0,0,0,5,0,5],
-  [0,0,0,0,0,5,0,0,0,0,0,0,5,0,0,0,0,0,0,0,5,0,0,5,0,0,5],
-  [0,0,5,0,0,5,0,0,0,5,0,0,5,0,5,0,0,5,0,0,5,0,0,5,0,0,5],
-  [0,5,5,5,0,5,5,0,5,5,0,5,5,5,5,0,5,5,5,5,0,0,5,0,5,0,5],
-  [0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0],
-  [5,5,5,0,0,5,0,0,0,0,0,0,5,0,5,0,0,0,0,0,0,5,0,0,5,5,5],
-  [0,5,0,0,0,5,0,0,0,0,0,0,0,5,5,0,0,5,0,0,0,0,0,0,5,0,0],
-  [5,5,0,0,5,5,0,5,0,0,0,0,5,0,5,0,0,0,0,0,0,5,0,5,5,5,0],
-  [5,5,0,0,5,5,0,0,0,0,0,0,5,0,5,0,0,0,0,0,0,0,0,0,5,5,5],
-  [5,0,0,0,0,5,0,0,0,0,0,0,0,0,5,0,0,0,0,0,5,0,0,0,5,5,0],
-  [5,5,2.5,0,5,5,2.5,2.5,0,0,0,2.5,5,2.5,2.5,0,0,0,0,0,2.5,0,0,2.5,5,5,5],
-  [2.5,5,2.5,0,2.5,5,0,0,0,2.5,0,0,2.5,0,2.5,0,0,0,0,0,5,0,0,0,2.5,5,0],
-];
-const R1_S = [
-  [5,5,0,0,5,5,5,0,0,0,0,0,5,0,5,0,0,0,0,0,0,0,0,5,5,5,5],
-  [5,5,5,2.5,2.5,5,2.5,0,5,2.5,5,2.5,5,2.5,2.5,0,2.5,5,5,2.5,2.5,2.5,0,2.5,5,2.5,5],
-  [5,0,2.5,0,0,2.5,0,0,0,0,0,2.5,2.5,0,0,0,0,0,2.5,0,0,5,0,2.5,0,2.5,0],
-  [2.5,0,2.5,2.5,2.5,5,2.5,2.5,2.5,2.5,2.5,2.5,5,5,2.5,2.5,2.5,0,2.5,2.5,2.5,5,0,2.5,2.5,2.5,5],
-  [2.5,0,0,0,0,5,0,0,0,0,0,0,2.5,0,0,0,0,0,0,0,2.5,0,0,0,0,2.5,0],
-  [2.5,0,0,0,0,2.5,0,0,0,0,0,0,2.5,0,0,0,0,0,0,0,2.5,0,0,0,0,2.5,0],
-  [5,5,5,2.5,2.5,5,0,0,0,5,0,0,5,0,0,0,0,0,0,0,5,0,0,2.5,2.5,5,5],
-  [5,5,5,0,5,5,5,5,0,0,0,0,5,0,0,0,0,0,0,0,0,5,0,5,5,5,5],
-  [5,5,5,0,5,5,5,5,0,0,0,0,5,0,0,0,0,0,0,0,0,5,0,5,5,5,5],
-  [5,5,5,2.5,5,5,5,5,2.5,2.5,5,5,5,5,0,2.5,5,5,2.5,2.5,5,5,2.5,2.5,5,5,5],
-  [2.5,0,5,0,0,5,2.5,2.5,0,0,0,0,0,0,0,0,0,0,0,0,2.5,0,0,0,2.5,0,0],
-  [2,3,5,1,0,4,2,2,0,3,1,2,2,3,0,0,1,3,0,1,2,1,0,0,0,1,0],
-  [0,0,0,0,0,5,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,2.5,2.5,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,0,0,0,0,0],
-  [1,1,3,0,0,2,0,0,0,1,0,1,2,0,0,0,0,0,1,0,1,2,0,0,0,1,0],
-  [5,0,5,0,0,5,0,5,0,0,0,0,5,0,0,0,0,0,0,0,0,5,0,5,5,0,0],
-  [5,5,5,0,5,5,0,5,0,0,0,0,5,0,0,0,0,0,0,0,0,5,0,5,5,5,5],
-  [2.5,2.5,5,0,2.5,2.5,2.5,2.5,0,0,2.5,5,5,5,0,0,0,0,2.5,0,2.5,5,0,2.5,5,2.5,5],
-  [4,2,3,0,2,5,1,2,0,0,0,4,3,2,0,0,1,3,0,0,1,3,0,0,0,1,0],
-];
-
-/* ---------- 補助 ---------- */
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 const r2 = (x) => Math.round(x * 100) / 100;
 const mean = (a) => (a.length ? r2(sum(a) / a.length) : 0);
 const fmtDelta = (d) => (d > 0 ? `+${d.toFixed(2)}` : d.toFixed(2));
+const stateOf = (v) => (v < 1.5 ? "重点課題" : v < 2.5 ? "要強化" : v < 3.5 ? "標準" : "良好");
 
-/** 1段階だけ上げる（設問形式ごとの刻みに従う） */
-function stepUp(v, type) {
-  if (type === "c2") return 5;
-  if (type === "c3") return v === 0 ? 2.5 : 5;
-  return Math.min(5, Math.floor(v) + 1);
+/** v_item_averages の行配列を、項目番号順の20要素配列に変換する */
+function toArray(rows, section) {
+  const out = Array(20).fill(0);
+  rows.filter((r) => r.section === section)
+      .forEach((r) => { out[r.item_no - 1] = Number(r.avg_score); });
+  return out;
 }
-function lcg(seed) { let s = seed; return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648; }
 
-/**
- * 調査回データの取得。
- * 実運用では getRoundSummaries / getItemAverages / getItemTrend の
- * 戻り値をここに流し込むだけで、以下の画面はそのまま動きます。
- */
-function loadRounds() {
-  const n = R1_K[0].length;
-  const base = [];
-  for (let i = 0; i < n; i++) {
-    base.push({
-      code: `A${String(i + 1).padStart(3, "0")}`,
-      age: AGES[i % AGES.length],
-      k: R1_K.map((row) => row[i]),
-      s: R1_S.map((row) => row[i]),
+/* ============================================================
+   ログイン画面
+   ============================================================ */
+function Login({ onDone }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    setErr(""); setBusy(true);
+    try {
+      await signIn(email.trim(), password);
+      onDone();
+    } catch (e) {
+      setErr(
+        String(e.message).includes("Invalid login credentials")
+          ? "メールアドレスまたはパスワードが違います。"
+          : `ログインできませんでした：${e.message}`
+      );
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="dz-login">
+      <div className="dz-card" style={{ maxWidth: 420, width: "100%", marginTop: 0 }}>
+        <h2>管理者ログイン</h2>
+        <p className="dz-muted">自治会の集計結果を見るには、管理者アカウントが必要です。</p>
+        <div className="dz-field" style={{ marginTop: 18 }}>
+          <label htmlFor="email">メールアドレス</label>
+          <input id="email" type="email" autoComplete="username" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </div>
+        <div className="dz-field" style={{ marginTop: 14 }}>
+          <label htmlFor="pw">パスワード</label>
+          <input id="pw" type="password" autoComplete="current-password" value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </div>
+        {err && <p className="dz-err">{err}</p>}
+        <div className="dz-actions">
+          <button className="dz-btn" onClick={submit} disabled={busy || !email || !password}>
+            {busy ? "確認しています…" : "ログイン"}
+          </button>
+        </div>
+        <p className="dz-muted" style={{ marginTop: 18, fontSize: 12 }}>
+          アカウントは Supabase の Authentication → Users で作成します。
+          作成後、association_admins テーブルへの登録も必要です（SETUP.md の 1-4）。
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   小さな部品
+   ============================================================ */
+function Kpi({ label, value, unit, delta, hi }) {
+  return (
+    <div className={`dz-kpi${hi ? " hi" : ""}`}>
+      <div className="k">{label}</div>
+      <div className="v">{value}{unit && <span className="u"> {unit}</span>}</div>
+      {delta !== undefined && delta !== null && !Number.isNaN(delta) && (
+        <div className={`d ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}>
+          {delta === 0 ? "増減なし" : `${fmtDelta(delta)} 前回比`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompareRadar({ title, items, a, b, aName, bName }) {
+  const hasA = Array.isArray(a);
+  const data = items.map((it, i) => ({
+    no: String(it.item_no), label: it.label,
+    ...(hasA ? { [aName]: a[i] } : {}),
+    [bName]: b[i],
+  }));
+  return (
+    <div className="dz-chart">
+      <h3>{title}</h3>
+      <div style={{ width: "100%", height: 330 }}>
+        <ResponsiveContainer>
+          <RadarChart data={data} outerRadius="72%">
+            <PolarGrid stroke="#d3dbd5" />
+            <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5b6b62" }} />
+            <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa8a0" }} />
+            <Tooltip formatter={(v, n) => [`${r2(v)} 点`, n]}
+              labelFormatter={(l) => { const d = data.find((x) => x.no === l); return `${l}. ${d ? d.label : ""}`; }}
+              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
+            <Legend wrapperStyle={{ fontSize: 13 }} />
+            {hasA && <Radar name={aName} dataKey={aName} stroke="#9aa8a0" fill="#9aa8a0" fillOpacity={0.16} strokeWidth={2} />}
+            <Radar name={bName} dataKey={bName} stroke="#00703c" fill="#00703c" fillOpacity={0.3} strokeWidth={2} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   調査回の運用パネル
+   ============================================================ */
+function RoundManager({ association, rounds, onChanged }) {
+  const [label, setLabel] = useState("");
+  const [phase, setPhase] = useState("baseline");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const surveyBase = `${window.location.origin}${window.location.pathname.replace(/admin\.html$/, "")}`;
+
+  const add = async () => {
+    if (!label.trim()) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await createRound({ associationId: association.id, label: label.trim(), phase });
+      setMsg(`「${r.label}」を作成しました。合言葉は ${r.access_code} です。受付を開始すると回答できるようになります。`);
+      setLabel("");
+      onChanged();
+    } catch (e) { setMsg(`作成できませんでした：${e.message}`); }
+    finally { setBusy(false); }
+  };
+
+  const toggle = async (round) => {
+    setBusy(true); setMsg("");
+    try {
+      await setRoundStatus(round.round_id, round.status === "open" ? "closed" : "open");
+      onChanged();
+    } catch (e) { setMsg(`変更できませんでした：${e.message}`); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="dz-card">
+      <h2>調査回の管理</h2>
+      <p className="dz-muted">受付中（open）の調査回だけが回答を受け付けます。</p>
+
+      <div className="dz-scroll">
+        <table className="dz-table" style={{ marginTop: 12 }}>
+          <thead>
+            <tr><th>調査回</th><th style={{ width: 90 }}>状態</th><th style={{ width: 80 }}>回答数</th>
+              <th>回答URL</th><th style={{ width: 110 }}>操作</th></tr>
+          </thead>
+          <tbody>
+            {rounds.map((r) => {
+              const url = `${surveyBase}?code=${r.access_code ?? ""}`;
+              return (
+                <tr key={r.round_id}>
+                  <td>{r.label}<br /><span className="dz-sub">{r.conducted_on}</span></td>
+                  <td><span className={`dz-pill ${r.status}`}>
+                    {r.status === "open" ? "受付中" : r.status === "closed" ? "終了" : "準備中"}
+                  </span></td>
+                  <td className="n">{r.respondents ?? 0}</td>
+                  <td>
+                    {r.access_code
+                      ? <button className="dz-link" onClick={() => navigator.clipboard?.writeText(url)}
+                          title="クリックでコピー">{url}</button>
+                      : <span className="dz-sub">—</span>}
+                  </td>
+                  <td>
+                    <button className="dz-btn xs ghost" disabled={busy} onClick={() => toggle(r)}>
+                      {r.status === "open" ? "受付を終了" : "受付を開始"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <h3>新しい調査回を作る</h3>
+      <div className="dz-newround">
+        <div className="dz-field" style={{ flex: "2 1 260px" }}>
+          <label htmlFor="rl">名称</label>
+          <input id="rl" value={label} onChange={(e) => setLabel(e.target.value)}
+            placeholder="例）2027年度 第1回（取組み後）" />
+        </div>
+        <div className="dz-field" style={{ flex: "1 1 180px" }}>
+          <label htmlFor="rp">区分</label>
+          <select id="rp" value={phase} onChange={(e) => setPhase(e.target.value)}>
+            <option value="baseline">現時点評価（取組み前）</option>
+            <option value="follow_up">取組み後評価</option>
+          </select>
+        </div>
+        <button className="dz-btn" disabled={busy || !label.trim()} onClick={add}>作成</button>
+      </div>
+      {msg && <p className="dz-note">{msg}</p>}
+    </div>
+  );
+}
+
+/* ============================================================
+   本体
+   ============================================================ */
+export default function AdminDashboard() {
+  const [session, setSession] = useState(undefined);   // undefined=確認中
+  const [assocs, setAssocs] = useState([]);
+  const [assocId, setAssocId] = useState("");
+  const [rounds, setRounds] = useState([]);
+  const [master, setMaster] = useState({ koudou: [], shodou: [] });
+  const [baseId, setBaseId] = useState("");
+  const [cmpId, setCmpId] = useState("");
+  const [baseAvg, setBaseAvg] = useState(null);
+  const [cmpAvg, setCmpAvg] = useState(null);
+  const [ageRows, setAgeRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  /* ---- ログイン状態 ---- */
+  useEffect(() => {
+    getSession().then(setSession).catch(() => setSession(null));
+    return onAuthChange(setSession);
+  }, []);
+
+  /* ---- 自治会と設問マスタ ---- */
+  const loadBase = useCallback(async () => {
+    setErr("");
+    try {
+      const [a, m] = await Promise.all([getMyAssociations(), getItemMaster()]);
+      setAssocs(a);
+      setMaster(m);
+      if (a.length) setAssocId((prev) => prev || a[0].id);
+    } catch (e) { setErr(e.message); }
+  }, []);
+
+  useEffect(() => { if (session) loadBase(); }, [session, loadBase]);
+
+  /* ---- 調査回一覧 ---- */
+  const loadRounds = useCallback(async () => {
+    if (!assocId) return;
+    setErr("");
+    try {
+      const rs = await getRoundSummaries(assocId);
+      setRounds(rs);
+      const withData = rs.filter((r) => (r.respondents ?? 0) > 0);
+      if (withData.length >= 2) {
+        setBaseId(withData[withData.length - 2].round_id);
+        setCmpId(withData[withData.length - 1].round_id);
+      } else if (withData.length === 1) {
+        setBaseId(""); setCmpId(withData[0].round_id);
+      } else { setBaseId(""); setCmpId(""); }
+    } catch (e) { setErr(e.message); }
+  }, [assocId]);
+
+  useEffect(() => { loadRounds(); }, [loadRounds]);
+
+  /* ---- 選ばれた調査回の集計 ---- */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!cmpId) { setCmpAvg(null); setBaseAvg(null); setAgeRows([]); return; }
+      setLoading(true); setErr("");
+      try {
+        const [cRows, bRows, totals] = await Promise.all([
+          getItemAverages(cmpId),
+          baseId ? getItemAverages(baseId) : Promise.resolve(null),
+          getTotalsByAttribute(cmpId),
+        ]);
+        if (cancelled) return;
+        setCmpAvg({ k: toArray(cRows, "koudou"), s: toArray(cRows, "shodou") });
+        setBaseAvg(bRows ? { k: toArray(bRows, "koudou"), s: toArray(bRows, "shodou") } : null);
+        setAgeRows(totals);
+      } catch (e) { if (!cancelled) setErr(e.message); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [baseId, cmpId]);
+
+  /* ---- 画面用に整形 ---- */
+  const baseRound = rounds.find((r) => r.round_id === baseId);
+  const cmpRound = rounds.find((r) => r.round_id === cmpId);
+
+  const trend = useMemo(() => rounds
+    .filter((r) => (r.respondents ?? 0) > 0)
+    .map((r) => ({
+      name: r.label.replace(/（.*/, ""),
+      防災行動力: Number(r.koudou_avg ?? 0),
+      初動対応力: Number(r.shodou_avg ?? 0),
+      総合: Number(r.total_avg ?? 0),
+    })), [rounds]);
+
+  const deltas = useMemo(() => {
+    if (!cmpAvg) return { up: [], down: [], all: [] };
+    const build = (items, key, sec) => items.map((it, i) => {
+      const now = cmpAvg[key][i];
+      const prev = baseAvg ? baseAvg[key][i] : null;
+      return { ...it, sec, now, prev, d: prev === null ? null : r2(now - prev) };
     });
+    const all = [...build(master.shodou, "s", "初動対応力"), ...build(master.koudou, "k", "防災行動力")];
+    const withD = all.filter((x) => x.d !== null);
+    return {
+      all,
+      up: [...withD].sort((a, b) => b.d - a.d).slice(0, 5),
+      down: [...withD].sort((a, b) => a.d - b.d).slice(0, 5),
+    };
+  }, [master, baseAvg, cmpAvg]);
+
+  const focus = useMemo(
+    () => deltas.all.filter((x) => x.now < 2.0).sort((a, b) => a.now - b.now).slice(0, 8),
+    [deltas]
+  );
+
+  const catRows = useMemo(() => {
+    if (!cmpAvg) return [];
+    const build = (items, key, cats) => cats.map((c) => {
+      const idx = items.map((it, i) => (it.category === c ? i : -1)).filter((i) => i >= 0);
+      const now = mean(idx.map((i) => cmpAvg[key][i]));
+      const prev = baseAvg ? mean(idx.map((i) => baseAvg[key][i])) : null;
+      return { cat: c, now, prev, d: prev === null ? null : r2(now - prev) };
+    });
+    return [...build(master.koudou, "k", K_CATS), ...build(master.shodou, "s", S_CATS)];
+  }, [master, baseAvg, cmpAvg]);
+
+  const byAge = useMemo(() => AGES.map((age) => {
+    const g = ageRows.filter((r) => r.age_band === age);
+    return { age, 平均総合点: g.length ? r2(mean(g.map((r) => Number(r.grand_total)))) : 0, n: g.length };
+  }).filter((x) => x.n > 0), [ageRows]);
+
+  const cmpTotal = Number(cmpRound?.total_avg ?? 0);
+
+  const exportCsv = () => {
+    if (!cmpAvg) return;
+    const head = ["区分", "No", "分類", "項目",
+      baseRound ? baseRound.label : "（比較なし）", cmpRound.label, "増減"];
+    const rows = deltas.all.map((x) => [
+      x.sec, x.item_no, x.category, x.label,
+      x.prev === null ? "" : x.prev.toFixed(2), x.now.toFixed(2),
+      x.d === null ? "" : x.d.toFixed(2),
+    ]);
+    const csv = [head, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `地域防災力_集計_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /* ============================================================
+     描画
+     ============================================================ */
+  if (session === undefined) {
+    return <div className="dz"><style>{CSS}</style>
+      <div className="dz-wrap"><div className="dz-card"><p>確認しています…</p></div></div></div>;
   }
-  const round1 = { id: "r1", label: "第1回（2024年度）", date: "2024-06", real: true, people: base };
+  if (session === null) {
+    return <div className="dz"><style>{CSS}</style><Login onDone={() => {}} /></div>;
+  }
 
-  // 第2回・第3回はUI確認用のデモ生成データ。実データではありません。
-  const grow = (prev, seed, extra, strength) => {
-    const rnd = lcg(seed);
-    const people = prev.people.map((p) => ({
-      code: p.code, age: p.age,
-      k: p.k.map((v, i) => (v < 5 && rnd() < strength * (1 - v / 6) ? stepUp(v, KOUDOU[i].type) : v)),
-      s: p.s.map((v, i) => (v < 5 && rnd() < strength * 1.15 * (1 - v / 6) ? stepUp(v, SHODOU[i].type) : v)),
-    }));
-    for (let j = 0; j < extra; j++) {
-      const src = people[Math.floor(rnd() * people.length)];
-      people.push({
-        code: `N${seed}${j}`, age: AGES[Math.floor(rnd() * AGES.length)],
-        k: src.k.map((v) => (rnd() < 0.3 ? Math.max(0, v - 2.5) : v)),
-        s: src.s.map((v) => (rnd() < 0.3 ? Math.max(0, v - 2.5) : v)),
-      });
-    }
-    return people;
-  };
-  const round2 = { id: "r2", label: "第2回（2025年度）", date: "2025-06", demo: true, people: grow(round1, 7, 9, 0.42) };
-  const round3 = { id: "r3", label: "第3回（2026年度）", date: "2026-06", demo: true, people: grow(round2, 23, 12, 0.36) };
-  return [round1, round2, round3];
+  const association = assocs.find((a) => a.id === assocId);
+
+  return (
+    <div className="dz">
+      <style>{CSS}</style>
+
+      <header className="dz-head">
+        <div className="dz-head-in">
+          <div className="dz-headrow">
+            <div>
+              <p className="dz-eyebrow">地域防災力評価・改善サイクル</p>
+              <h1 className="dz-title">{association ? association.name : "管理・集計"}</h1>
+            </div>
+            <button className="dz-btn xs ghost light" onClick={() => signOut()}>ログアウト</button>
+          </div>
+
+          <div className="dz-sel">
+            {assocs.length > 1 && (
+              <div>
+                <label htmlFor="as">自治会</label>
+                <select id="as" value={assocId} onChange={(e) => setAssocId(e.target.value)}>
+                  {assocs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label htmlFor="base">基準にする回</label>
+              <select id="base" value={baseId} onChange={(e) => setBaseId(e.target.value)}>
+                <option value="">（比較しない）</option>
+                {rounds.filter((r) => (r.respondents ?? 0) > 0 && r.round_id !== cmpId)
+                  .map((r) => <option key={r.round_id} value={r.round_id}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cmp">表示する回</label>
+              <select id="cmp" value={cmpId} onChange={(e) => setCmpId(e.target.value)}>
+                {rounds.filter((r) => (r.respondents ?? 0) > 0)
+                  .map((r) => <option key={r.round_id} value={r.round_id}>{r.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="dz-wrap">
+        {err && <p className="dz-err card">{err}</p>}
+
+        {assocs.length === 0 && !err && (
+          <div className="dz-card">
+            <h2>担当する自治会が見つかりません</h2>
+            <p>ログインはできていますが、このアカウントはどの自治会にも紐付いていません。
+              Supabase の SQL Editor で次を実行してください（UID は Authentication → Users で確認できます）。</p>
+            <pre className="dz-pre">{`insert into association_admins (association_id, user_id, role)
+select a.id, '<あなたのUID>', 'owner'
+from associations a where a.name = '〇〇自治会';`}</pre>
+          </div>
+        )}
+
+        {association && (
+          <>
+            {!cmpId ? (
+              <div className="dz-card">
+                <h2>まだ回答が届いていません</h2>
+                <p className="dz-muted">
+                  下の「調査回の管理」で受付を開始し、回答URLを配布してください。
+                  回答が1件でも届くと、ここに集計が表示されます。
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="dz-kpis">
+                  <Kpi label="回答数" value={cmpRound.respondents ?? 0} unit="名"
+                    delta={baseRound ? (cmpRound.respondents ?? 0) - (baseRound.respondents ?? 0) : undefined} />
+                  <Kpi label="回答率" value={cmpRound.response_rate ?? "—"} unit={cmpRound.response_rate ? "%" : ""}
+                    delta={baseRound && cmpRound.response_rate && baseRound.response_rate
+                      ? r2(cmpRound.response_rate - baseRound.response_rate) : undefined} />
+                  <Kpi label="防災行動力" value={Number(cmpRound.koudou_avg ?? 0).toFixed(1)} unit="/100"
+                    delta={baseRound ? r2(cmpRound.koudou_avg - baseRound.koudou_avg) : undefined} />
+                  <Kpi label="初動対応力" value={Number(cmpRound.shodou_avg ?? 0).toFixed(1)} unit="/100"
+                    delta={baseRound ? r2(cmpRound.shodou_avg - baseRound.shodou_avg) : undefined} />
+                  <Kpi label="総合得点" value={cmpTotal.toFixed(1)} unit="/200"
+                    delta={baseRound ? r2(cmpRound.total_avg - baseRound.total_avg) : undefined} hi />
+                </div>
+
+                {loading && <p className="dz-muted" style={{ marginTop: 12 }}>集計しています…</p>}
+
+                {trend.length >= 2 && (
+                  <>
+                    <div className="dz-band"><b>推移</b><span>回答のあった調査回すべて</span></div>
+                    <div className="dz-chart" style={{ marginTop: 16, padding: "16px 12px 8px" }}>
+                      <div style={{ width: "100%", height: 260 }}>
+                        <ResponsiveContainer>
+                          <LineChart data={trend} margin={{ top: 16, right: 20, left: 0, bottom: 4 }}>
+                            <CartesianGrid stroke="#e6ebe7" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fontSize: 13 }} />
+                            <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
+                            <Tooltip formatter={(v, n) => [`${v} 点`, n]}
+                              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
+                            <Legend wrapperStyle={{ fontSize: 13 }} />
+                            <Line type="monotone" dataKey="総合" stroke="#004f2a" strokeWidth={3} dot={{ r: 5 }} />
+                            <Line type="monotone" dataKey="防災行動力" stroke="#00703c" strokeWidth={2} dot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="初動対応力" stroke="#e0a12c" strokeWidth={2} dot={{ r: 4 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {cmpAvg && (
+                  <>
+                    <div className="dz-band">
+                      <b>項目別の評価</b>
+                      <span>{baseRound ? `${baseRound.label} → ${cmpRound.label}` : cmpRound.label}</span>
+                    </div>
+                    <div className="dz-charts">
+                      <CompareRadar title="防災行動力" items={master.koudou}
+                        a={baseAvg?.k} b={cmpAvg.k}
+                        aName={baseRound?.label ?? "基準"} bName={cmpRound.label} />
+                      <CompareRadar title="初動対応力" items={master.shodou}
+                        a={baseAvg?.s} b={cmpAvg.s}
+                        aName={baseRound?.label ?? "基準"} bName={cmpRound.label} />
+                    </div>
+
+                    <div className="dz-card">
+                      <h2>区分別の平均</h2>
+                      <div className="dz-scroll">
+                        <table className="dz-table" style={{ marginTop: 10 }}>
+                          <thead>
+                            <tr>
+                              <th>区分</th>
+                              {baseRound && <th style={{ width: 110 }}>{baseRound.label}</th>}
+                              <th style={{ width: 110 }}>{cmpRound.label}</th>
+                              {baseRound && <th style={{ width: 90 }}>増減</th>}
+                              <th style={{ width: 100 }}>状態</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {catRows.map((r) => (
+                              <tr key={r.cat}>
+                                <td>{r.cat}</td>
+                                {baseRound && <td className="n">{r.prev.toFixed(2)}</td>}
+                                <td className="n">{r.now.toFixed(2)}</td>
+                                {baseRound && (
+                                  <td className={`n ${r.d > 0 ? "up" : r.d < 0 ? "down" : ""}`}
+                                    style={{ fontWeight: 800 }}>{fmtDelta(r.d)}</td>
+                                )}
+                                <td>{stateOf(r.now)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {baseRound && (
+                      <div className="dz-card">
+                        <h2>項目別の増減</h2>
+                        <div className="dz-two" style={{ marginTop: 10 }}>
+                          <div>
+                            <h3 style={{ marginTop: 0 }}>伸びた項目</h3>
+                            {deltas.up.map((x) => (
+                              <div className="dz-row" key={`u${x.sec}${x.item_no}`}>
+                                <span className="dz-tag" style={{ background: "#00703c" }}>{fmtDelta(x.d)}</span>
+                                <span><b>{x.category}／{x.item_no}. {x.label}</b>
+                                  <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
+                              </div>
+                            ))}
+                          </div>
+                          <div>
+                            <h3 style={{ marginTop: 0 }}>下がった・伸びていない項目</h3>
+                            {deltas.down.map((x) => (
+                              <div className="dz-row" key={`d${x.sec}${x.item_no}`}>
+                                <span className="dz-tag" style={{ background: x.d < 0 ? "#c1272d" : "#9aa8a0" }}>{fmtDelta(x.d)}</span>
+                                <span><b>{x.category}／{x.item_no}. {x.label}</b>
+                                  <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="dz-band"><b>次回への提案</b><span>2.0点未満の項目</span></div>
+                    <div className="dz-card">
+                      {focus.length === 0
+                        ? <p className="dz-muted">2.0点未満の項目はありません。</p>
+                        : focus.map((x, i) => (
+                          <div className="dz-row" key={`f${x.sec}${x.item_no}`}>
+                            <span className="dz-tag" style={{ background: x.now < 1 ? "#c1272d" : "#e0a12c" }}>{i + 1}</span>
+                            <span>
+                              <b>{x.sec}／{x.category}／{x.item_no}. {x.label}</b>
+                              <span className="sc">
+                                現状 {x.now.toFixed(2)} 点{x.d !== null && `（前回比 ${fmtDelta(x.d)}）`}
+                              </span>
+                              <p>{x.improvement_tip}</p>
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+
+                    {byAge.length > 0 && (
+                      <div className="dz-card">
+                        <h2>年代別の総合得点</h2>
+                        <p className="dz-muted">
+                          {cmpRound.label}。世代で差が出る場合、周知の手段を分ける判断材料になります。
+                        </p>
+                        <div style={{ width: "100%", height: 240, marginTop: 8 }}>
+                          <ResponsiveContainer>
+                            <BarChart data={byAge} margin={{ top: 10, right: 20, left: 0, bottom: 4 }}>
+                              <CartesianGrid stroke="#e6ebe7" vertical={false} />
+                              <XAxis dataKey="age" tick={{ fontSize: 13 }} />
+                              <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
+                              <Tooltip contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }}
+                                formatter={(v, n, p) => [`${v} 点（${p.payload.n}名）`, "平均総合点"]} />
+                              <ReferenceLine y={cmpTotal} stroke="#e0a12c" strokeDasharray="4 4"
+                                label={{ value: "全体平均", position: "right", fontSize: 11, fill: "#8a6a1e" }} />
+                              <Bar dataKey="平均総合点" radius={[4, 4, 0, 0]}>
+                                {byAge.map((d) => (
+                                  <Cell key={d.age} fill={d.平均総合点 >= cmpTotal ? "#00703c" : "#9aa8a0"} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="dz-card">
+                      <h2>書き出し</h2>
+                      <p className="dz-muted">
+                        全40項目の平均点を含むCSVです。無料プランに自動バックアップは無いので、
+                        調査が終わるたびに保存してください。
+                      </p>
+                      <div className="dz-actions">
+                        <button className="dz-btn" onClick={exportCsv}>CSVをダウンロード</button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            <RoundManager association={association} rounds={rounds} onChanged={loadRounds} />
+          </>
+        )}
+      </main>
+    </div>
+  );
 }
 
-const ROUNDS = loadRounds();
-const HOUSEHOLDS = 62; // 対象世帯数（回答率の分母）
-
-function roundStats(round) {
-  const kAvg = KOUDOU.map((_, i) => mean(round.people.map((p) => p.k[i])));
-  const sAvg = SHODOU.map((_, i) => mean(round.people.map((p) => p.s[i])));
-  return {
-    kAvg, sAvg,
-    kTotal: r2(sum(kAvg)), sTotal: r2(sum(sAvg)),
-    total: r2(sum(kAvg) + sum(sAvg)),
-    n: round.people.length,
-    rate: r2((round.people.length / HOUSEHOLDS) * 100),
-  };
-}
-
-/* ---------- スタイル ---------- */
+/* ============================================================
+   スタイル
+   ============================================================ */
 const CSS = `
 .dz{--ink:#16211c;--sub:#5b6b62;--line:#d3dbd5;--paper:#eef2ee;--green:#00703c;--green-d:#004f2a;
  --green-l:#e3efe8;--red:#c1272d;--amber:#e0a12c;--amber-l:#fbf1dd;
- color:var(--ink);background:var(--paper);font-size:16px;line-height:1.7;min-height:100%;
+ color:var(--ink);background:var(--paper);font-size:16px;line-height:1.7;min-height:100vh;
  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,"Noto Sans JP",Meiryo,sans-serif;}
 .dz *{box-sizing:border-box;}
 .dz-wrap{max-width:1080px;margin:0 auto;padding:0 16px 72px;}
+.dz-login{display:grid;place-items:center;min-height:100vh;padding:20px;}
 .dz-head{background:var(--green-d);color:#fff;border-bottom:6px solid var(--amber);}
 .dz-head-in{max-width:1080px;margin:0 auto;padding:18px 16px;}
+.dz-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
 .dz-eyebrow{font-size:11px;letter-spacing:.3em;opacity:.72;margin:0 0 4px;}
 .dz-title{font-size:24px;font-weight:900;margin:0;letter-spacing:.02em;}
 .dz-sel{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px;}
 .dz-sel label{font-size:12px;letter-spacing:.14em;opacity:.8;display:block;margin-bottom:4px;}
-.dz-sel select{font:inherit;font-size:15px;padding:9px 12px;border-radius:6px;border:0;background:#fff;color:var(--ink);min-width:190px;}
+.dz-sel select{font:inherit;font-size:15px;padding:9px 12px;border-radius:6px;border:0;
+ background:#fff;color:var(--ink);min-width:190px;}
 .dz-card{background:#fff;border:1px solid var(--line);border-radius:6px;padding:20px;margin-top:16px;}
 .dz-card h2{font-size:18px;font-weight:900;margin:0 0 2px;}
-.dz-card h3{font-size:15px;font-weight:800;margin:20px 0 6px;}
+.dz-card h3{font-size:15px;font-weight:800;margin:22px 0 6px;}
 .dz-muted{color:var(--sub);font-size:13px;margin:0;}
-.dz-band{display:flex;gap:12px;align-items:baseline;background:var(--green);color:#fff;padding:9px 14px;border-radius:4px;margin-top:22px;}
+.dz-sub{color:var(--sub);font-size:12px;}
+.dz-err{color:var(--red);font-weight:700;font-size:15px;margin:12px 0 0;}
+.dz-err.card{background:#fff;border:1px solid var(--red);border-radius:6px;padding:14px 18px;}
+.dz-band{display:flex;gap:12px;align-items:baseline;background:var(--green);color:#fff;
+ padding:9px 14px;border-radius:4px;margin-top:24px;}
 .dz-band b{font-size:17px;font-weight:900;letter-spacing:.04em;}
 .dz-band span{font-size:12px;opacity:.85;}
-.dz-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px;background:var(--line);
- border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:16px;}
+.dz-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px;
+ background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:16px;}
 .dz-kpi{background:#fff;padding:16px;}
 .dz-kpi .k{font-size:11px;letter-spacing:.16em;color:var(--sub);}
 .dz-kpi .v{font-size:34px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums;}
@@ -220,10 +690,10 @@ const CSS = `
 .dz-chart{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 8px 6px;}
 .dz-chart h3{text-align:center;font-size:15px;margin:4px 0 0;}
 .dz-table{width:100%;border-collapse:collapse;font-size:14px;}
-.dz-table th,.dz-table td{border:1px solid var(--line);padding:7px 10px;text-align:left;}
+.dz-table th,.dz-table td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
 .dz-table th{background:var(--green-l);font-weight:800;font-size:13px;}
 .dz-table td.n{text-align:right;font-variant-numeric:tabular-nums;}
-.dz-scroll{overflow-x:auto;margin-top:10px;}
+.dz-scroll{overflow-x:auto;}
 .dz-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;}
 .dz-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start;}
 .dz-row:last-child{border-bottom:0;}
@@ -232,283 +702,32 @@ const CSS = `
 .dz-row b{display:block;font-size:14px;line-height:1.45;}
 .dz-row p{margin:3px 0 0;font-size:14px;}
 .dz-row .sc{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;}
-.dz-note{background:var(--amber-l);border-left:5px solid var(--amber);padding:10px 14px;border-radius:0 6px 6px 0;font-size:14px;margin-top:16px;}
+.dz-note{background:var(--amber-l);border-left:5px solid var(--amber);padding:10px 14px;
+ border-radius:0 6px 6px 0;font-size:14px;margin-top:16px;}
+.dz-pre{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:12px;
+ font-size:13px;overflow-x:auto;white-space:pre;margin-top:12px;}
+.dz-pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:800;}
+.dz-pill.open{background:var(--green);color:#fff;}
+.dz-pill.closed{background:#9aa8a0;color:#fff;}
+.dz-pill.draft{background:var(--amber-l);color:#8a6a1e;}
+.dz-link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--green-d);
+ text-decoration:underline;cursor:pointer;word-break:break-all;text-align:left;}
+.dz-field label{display:block;font-weight:700;font-size:13px;margin-bottom:5px;}
+.dz-field input,.dz-field select{width:100%;font:inherit;font-size:15px;padding:11px;
+ border:2px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);}
+.dz-newround{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;}
 .dz-btn{appearance:none;border:0;border-radius:6px;font:inherit;font-size:15px;font-weight:800;
  padding:12px 22px;cursor:pointer;background:var(--green);color:#fff;}
 .dz-btn:hover{background:var(--green-d);}
+.dz-btn:disabled{background:#b6c2ba;cursor:not-allowed;}
 .dz-btn.ghost{background:#fff;color:var(--green-d);border:2px solid var(--green);}
-.dz-btn:focus-visible,.dz-sel select:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
+.dz-btn.ghost:hover{background:var(--green-l);}
+.dz-btn.ghost.light{background:transparent;color:#fff;border-color:rgba(255,255,255,.6);}
+.dz-btn.ghost.light:hover{background:rgba(255,255,255,.15);}
+.dz-btn.xs{font-size:13px;padding:7px 12px;}
 .dz-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.dz-btn:focus-visible,.dz-sel select:focus-visible,.dz-field input:focus,
+.dz-field select:focus,.dz-link:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
 @media (max-width:600px){.dz-kpi .v{font-size:27px;}.dz-title{font-size:19px;}}
-@media (prefers-reduced-motion:reduce){.dz *{transition:none!important;animation:none!important;}}
+@media (prefers-reduced-motion:reduce){.dz *{transition:none!important;}}
 `;
-
-/* ---------- 部品 ---------- */
-function Kpi({ label, value, unit, delta, hi }) {
-  return (
-    <div className={`dz-kpi${hi ? " hi" : ""}`}>
-      <div className="k">{label}</div>
-      <div className="v">{value}{unit && <span className="u"> {unit}</span>}</div>
-      {delta !== undefined && delta !== null && (
-        <div className={`d ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`}>
-          {delta === 0 ? "増減なし" : `${fmtDelta(delta)} 前回比`}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CompareRadar({ title, items, a, b, aName, bName }) {
-  const data = items.map((it, i) => ({ no: String(it.no), label: it.label, [aName]: a[i], [bName]: b[i] }));
-  return (
-    <div className="dz-chart">
-      <h3>{title}</h3>
-      <div style={{ width: "100%", height: 330 }}>
-        <ResponsiveContainer>
-          <RadarChart data={data} outerRadius="72%">
-            <PolarGrid stroke="#d3dbd5" />
-            <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5b6b62" }} />
-            <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa8a0" }} />
-            <Tooltip
-              formatter={(v, n) => [`${r2(v)} 点`, n]}
-              labelFormatter={(l) => { const d = data.find((x) => x.no === l); return `${l}. ${d ? d.label : ""}`; }}
-              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
-            <Legend wrapperStyle={{ fontSize: 13 }} />
-            <Radar name={aName} dataKey={aName} stroke="#9aa8a0" fill="#9aa8a0" fillOpacity={0.16} strokeWidth={2} />
-            <Radar name={bName} dataKey={bName} stroke="#00703c" fill="#00703c" fillOpacity={0.3} strokeWidth={2} />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================ */
-export default function AdminDashboard() {
-  const [baseId, setBaseId] = useState(ROUNDS[ROUNDS.length - 2].id);
-  const [cmpId, setCmpId] = useState(ROUNDS[ROUNDS.length - 1].id);
-
-  const baseRound = ROUNDS.find((r) => r.id === baseId);
-  const cmpRound = ROUNDS.find((r) => r.id === cmpId);
-  const A = useMemo(() => roundStats(baseRound), [baseRound]);
-  const B = useMemo(() => roundStats(cmpRound), [cmpRound]);
-
-  /* 総合得点の推移 */
-  const trend = useMemo(() => ROUNDS.map((r) => {
-    const st = roundStats(r);
-    return { name: r.label.replace(/（.*/, ""), 防災行動力: st.kTotal, 初動対応力: st.sTotal, 総合: st.total, n: st.n };
-  }), []);
-
-  /* 項目別の増減 */
-  const deltas = useMemo(() => {
-    const all = [
-      ...KOUDOU.map((it, i) => ({ ...it, prev: A.kAvg[i], now: B.kAvg[i], d: r2(B.kAvg[i] - A.kAvg[i]) })),
-      ...SHODOU.map((it, i) => ({ ...it, prev: A.sAvg[i], now: B.sAvg[i], d: r2(B.sAvg[i] - A.sAvg[i]) })),
-    ];
-    return { up: [...all].sort((x, y) => y.d - x.d).slice(0, 5), down: [...all].sort((x, y) => x.d - y.d).slice(0, 5), all };
-  }, [A, B]);
-
-  /* 残る重点課題（比較回で2.0点未満） */
-  const focus = useMemo(
-    () => deltas.all.filter((x) => x.now < 2.0).sort((a, b) => a.now - b.now).slice(0, 8),
-    [deltas]
-  );
-
-  /* 区分別 */
-  const catRows = useMemo(() => {
-    const build = (items, aArr, bArr, cats) => cats.map((c) => {
-      const idx = items.map((it, i) => (it.cat === c ? i : -1)).filter((i) => i >= 0);
-      const pa = mean(idx.map((i) => aArr[i]));
-      const pb = mean(idx.map((i) => bArr[i]));
-      return { cat: c, prev: pa, now: pb, d: r2(pb - pa) };
-    });
-    return [...build(KOUDOU, A.kAvg, B.kAvg, K_CATS), ...build(SHODOU, A.sAvg, B.sAvg, S_CATS)];
-  }, [A, B]);
-
-  /* 年代別の総合得点 */
-  const byAge = useMemo(() => AGES.map((age) => {
-    const g = cmpRound.people.filter((p) => p.age === age);
-    return { age, 平均総合点: g.length ? r2(mean(g.map((p) => sum(p.k) + sum(p.s)))) : 0, n: g.length };
-  }), [cmpRound]);
-
-  const exportCsv = () => {
-    const head = ["区分", "No", "項目", baseRound.label, cmpRound.label, "増減"];
-    const rows = deltas.all.map((x) => [
-      x.section === "koudou" ? "防災行動力" : "初動対応力",
-      x.no, x.label, x.prev.toFixed(2), x.now.toFixed(2), x.d.toFixed(2),
-    ]);
-    const csv = [head, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `地域防災力_経年比較_${baseRound.id}_${cmpRound.id}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
-  return (
-    <div className="dz">
-      <style>{CSS}</style>
-
-      <header className="dz-head">
-        <div className="dz-head-in">
-          <p className="dz-eyebrow">地域防災力評価・改善サイクル</p>
-          <h1 className="dz-title">〇〇自治会　管理・集計</h1>
-          <div className="dz-sel">
-            <div>
-              <label htmlFor="base">基準にする回</label>
-              <select id="base" value={baseId} onChange={(e) => setBaseId(e.target.value)}>
-                {ROUNDS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="cmp">比較する回</label>
-              <select id="cmp" value={cmpId} onChange={(e) => setCmpId(e.target.value)}>
-                {ROUNDS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="dz-wrap">
-        {(baseRound.demo || cmpRound.demo) && (
-          <p className="dz-note">
-            第1回は提供された実データ（役員・区長27名）です。第2回・第3回は画面の動きを確認するための<b>デモ生成データ</b>で、実際の調査結果ではありません。
-          </p>
-        )}
-
-        <div className="dz-kpis">
-          <Kpi label="回答数" value={B.n} unit="名" delta={B.n - A.n} />
-          <Kpi label="回答率" value={B.rate.toFixed(1)} unit="%" delta={r2(B.rate - A.rate)} />
-          <Kpi label="防災行動力" value={B.kTotal.toFixed(1)} unit="/100" delta={r2(B.kTotal - A.kTotal)} />
-          <Kpi label="初動対応力" value={B.sTotal.toFixed(1)} unit="/100" delta={r2(B.sTotal - A.sTotal)} />
-          <Kpi label="総合得点" value={B.total.toFixed(1)} unit="/200" delta={r2(B.total - A.total)} hi />
-        </div>
-
-        <div className="dz-band"><b>経年比較</b><span>{baseRound.label} → {cmpRound.label}</span></div>
-
-        <div className="dz-chart" style={{ marginTop: 16, padding: "16px 12px 8px" }}>
-          <h3>調査回ごとの平均得点の推移</h3>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer>
-              <LineChart data={trend} margin={{ top: 16, right: 20, left: 0, bottom: 4 }}>
-                <CartesianGrid stroke="#e6ebe7" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 13 }} />
-                <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
-                <Tooltip contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }}
-                  formatter={(v, n) => [`${v} 点`, n]} />
-                <Legend wrapperStyle={{ fontSize: 13 }} />
-                <Line type="monotone" dataKey="総合" stroke="#004f2a" strokeWidth={3} dot={{ r: 5 }} />
-                <Line type="monotone" dataKey="防災行動力" stroke="#00703c" strokeWidth={2} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="初動対応力" stroke="#e0a12c" strokeWidth={2} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="dz-charts">
-          <CompareRadar title="防災行動力" items={KOUDOU} a={A.kAvg} b={B.kAvg}
-            aName={baseRound.label} bName={cmpRound.label} />
-          <CompareRadar title="初動対応力" items={SHODOU} a={A.sAvg} b={B.sAvg}
-            aName={baseRound.label} bName={cmpRound.label} />
-        </div>
-
-        <div className="dz-card">
-          <h2>区分別の変化</h2>
-          <p className="dz-muted">5点満点。取り組みの効果が区分単位でどう出たかを見ます。</p>
-          <div className="dz-scroll">
-            <table className="dz-table">
-              <thead>
-                <tr><th>区分</th><th style={{ width: 100 }}>{baseRound.label}</th>
-                  <th style={{ width: 100 }}>{cmpRound.label}</th><th style={{ width: 90 }}>増減</th><th>状態</th></tr>
-              </thead>
-              <tbody>
-                {catRows.map((r) => (
-                  <tr key={r.cat}>
-                    <td>{r.cat}</td>
-                    <td className="n">{r.prev.toFixed(2)}</td>
-                    <td className="n">{r.now.toFixed(2)}</td>
-                    <td className={`n ${r.d > 0 ? "up" : r.d < 0 ? "down" : ""}`} style={{ fontWeight: 800 }}>{fmtDelta(r.d)}</td>
-                    <td>{r.now < 1.5 ? "重点課題" : r.now < 2.5 ? "要強化" : r.now < 3.5 ? "標準" : "良好"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="dz-card">
-          <h2>項目別の増減</h2>
-          <div className="dz-two" style={{ marginTop: 10 }}>
-            <div>
-              <h3 style={{ marginTop: 0 }}>伸びた項目</h3>
-              {deltas.up.map((x) => (
-                <div className="dz-row" key={`u${x.section}${x.no}`}>
-                  <span className="dz-tag" style={{ background: "#00703c" }}>{fmtDelta(x.d)}</span>
-                  <span><b>{x.cat}／{x.no}. {x.label}</b>
-                    <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
-                </div>
-              ))}
-            </div>
-            <div>
-              <h3 style={{ marginTop: 0 }}>下がった・伸びていない項目</h3>
-              {deltas.down.map((x) => (
-                <div className="dz-row" key={`d${x.section}${x.no}`}>
-                  <span className="dz-tag" style={{ background: x.d < 0 ? "#c1272d" : "#9aa8a0" }}>{fmtDelta(x.d)}</span>
-                  <span><b>{x.cat}／{x.no}. {x.label}</b>
-                    <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="dz-band"><b>次年度への提案</b><span>{cmpRound.label}で2.0点未満の項目</span></div>
-        <div className="dz-card">
-          {focus.length === 0
-            ? <p className="dz-muted">2.0点未満の項目はありません。しきい値を上げて点検してください。</p>
-            : focus.map((x, i) => (
-              <div className="dz-row" key={`f${x.section}${x.no}`}>
-                <span className="dz-tag" style={{ background: x.now < 1 ? "#c1272d" : "#e0a12c" }}>{i + 1}</span>
-                <span>
-                  <b>{x.cat}／{x.no}. {x.label}</b>
-                  <span className="sc">現状 {x.now.toFixed(2)} 点（前回比 {fmtDelta(x.d)}）</span>
-                  <p>{x.tip}</p>
-                </span>
-              </div>
-            ))}
-        </div>
-
-        <div className="dz-card">
-          <h2>年代別の総合得点</h2>
-          <p className="dz-muted">{cmpRound.label}・n={B.n}。世代で差が出る場合、周知の手段を分ける判断材料になります。</p>
-          <div style={{ width: "100%", height: 240, marginTop: 8 }}>
-            <ResponsiveContainer>
-              <BarChart data={byAge} margin={{ top: 10, right: 20, left: 0, bottom: 4 }}>
-                <CartesianGrid stroke="#e6ebe7" vertical={false} />
-                <XAxis dataKey="age" tick={{ fontSize: 13 }} />
-                <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
-                <Tooltip contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }}
-                  formatter={(v, n, p) => [`${v} 点（${p.payload.n}名）`, "平均総合点"]} />
-                <ReferenceLine y={B.total} stroke="#e0a12c" strokeDasharray="4 4"
-                  label={{ value: "全体平均", position: "right", fontSize: 11, fill: "#8a6a1e" }} />
-                <Bar dataKey="平均総合点" radius={[4, 4, 0, 0]}>
-                  {byAge.map((d) => <Cell key={d.age} fill={d.平均総合点 >= B.total ? "#00703c" : "#9aa8a0"} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="dz-card">
-          <h2>書き出し</h2>
-          <p className="dz-muted">全40項目の平均点と増減を含むCSVです。報告書への貼り付けにそのまま使えます。</p>
-          <div className="dz-actions">
-            <button className="dz-btn" onClick={exportCsv}>経年比較CSVをダウンロード</button>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
