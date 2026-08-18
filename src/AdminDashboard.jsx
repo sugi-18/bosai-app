@@ -21,6 +21,7 @@ import {
 } from "./lib/bosai-supabase-api";
 import PaperEntry from "./PaperEntry";
 import FreeTextPanel from "./FreeTextPanel";
+import RespondentCards from "./RespondentCards";
 
 /* ============================================================
    定数・補助
