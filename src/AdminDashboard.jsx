@@ -24,6 +24,7 @@ import FreeTextPanel from "./FreeTextPanel";
 import RespondentCards from "./RespondentCards";
 import ItemRanking from "./ItemRanking";
 import CrossTab from "./CrossTab";
+import ActionPlan from "./ActionPlan";
 
 /* ============================================================
    定数・補助
@@ -601,6 +602,9 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                           </div>
                         ))}
                     </div>
+
+                    <ActionPlan association={association} rounds={rounds} master={master}
+                      cmpId={cmpId} focus={focus} />
 
                     <CrossTab roundId={cmpId} roundLabel={cmpRound.label} master={master} />
 
