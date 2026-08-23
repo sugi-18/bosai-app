@@ -70,6 +70,42 @@ const HOUSE = [
   "7人以上",
 ];
 
+const RESIDENCE = [
+  "1年未満",
+  "1〜4年",
+  "5〜9年",
+  "10〜19年",
+  "20年以上",
+];
+
+/* 文字の大きさ。1=標準 2=大 3=特大 */
+const FONT_SIZES = [
+  { v: 1, label: "標準" },
+  { v: 2, label: "大" },
+  { v: 3, label: "特大" },
+];
+
+const PREF_KEY = "bosai-survey-pref";
+
+/** 表示の好み（文字の大きさ・1問ずつ表示）を控えておく */
+function loadPref() {
+  try {
+    const raw = localStorage.getItem(PREF_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function savePref(pref) {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify(pref));
+  } catch {
+    /* 保存できなくても回答には支障がない */
+  }
+}
+
 const K_CATS = [
   "被害拡大防止",
   "備蓄状況",
@@ -206,6 +242,7 @@ export default function BosaiSurvey() {
     age_band: "",
     sex: "",
     household_size: "",
+    residence_years: "",
     certifications: "",
     job_constraint: "",
     health_constraint: "",
@@ -215,6 +252,23 @@ export default function BosaiSurvey() {
   const [step, setStep] = useState(0);
 
   const [codeWarn, setCodeWarn] = useState("");
+
+
+  /* ---- 表示の好み ---- */
+
+  const [fontScale, setFontScale] = useState(
+    () => loadPref().fontScale ?? 1
+  );
+
+  const [oneByOne, setOneByOne] = useState(
+    () => loadPref().oneByOne ?? false
+  );
+
+  const [qIdx, setQIdx] = useState(0);
+
+  useEffect(() => {
+    savePref({ fontScale, oneByOne });
+  }, [fontScale, oneByOne]);
 
 
   /* ---- 結果 ---- */
@@ -523,6 +577,34 @@ export default function BosaiSurvey() {
     );
 
 
+  /* 残りの所要時間の目安。1問あたり18秒で見積もる */
+
+  const remainMin =
+    Math.max(
+      0,
+      Math.ceil(
+        ((40 - answered) * 18) / 60
+      )
+    );
+
+
+  /* 1問ずつ表示するときの並び（初動対応力20問 → 防災行動力20問） */
+
+  const flat = useMemo(
+    () => [
+      ...master.shodou.map((it) => ({
+        sec: "s",
+        it,
+      })),
+      ...master.koudou.map((it) => ({
+        sec: "k",
+        it,
+      })),
+    ],
+    [master]
+  );
+
+
   /* ============================================================
      未回答
      ============================================================ */
@@ -781,16 +863,20 @@ export default function BosaiSurvey() {
   ];
 
 
+  const toTop = () =>
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+
+
   const next = () => {
 
     setStep(
       (s) => s + 1
     );
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    toTop();
 
   };
 
@@ -801,17 +887,111 @@ export default function BosaiSurvey() {
       (s) => s - 1
     );
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    toTop();
 
   };
 
 
+  /* ---- 1問ずつ表示のときの前後移動 ---- */
+
+  const goNext = () => {
+
+    if (oneByOne && step < 2) {
+
+      if (qIdx < flat.length - 1) {
+        setQIdx(qIdx + 1);
+        toTop();
+        return;
+      }
+
+      setStep(2);
+      toTop();
+      return;
+
+    }
+
+    next();
+
+  };
+
+
+  const goBack = () => {
+
+    if (oneByOne && step === 2) {
+      setStep(0);
+      setQIdx(Math.max(0, flat.length - 1));
+      toTop();
+      return;
+    }
+
+    if (oneByOne && step < 2) {
+      if (qIdx > 0) {
+        setQIdx(qIdx - 1);
+        toTop();
+      }
+      return;
+    }
+
+    back();
+
+  };
+
+
+  /* まとめて表示 ⇔ 1問ずつ表示。今いる場所を保ったまま切り替える */
+
+  const toggleMode = () => {
+
+    if (!oneByOne) {
+
+      if (step === 1) {
+        setQIdx(
+          Math.min(20, Math.max(0, flat.length - 1))
+        );
+        setStep(0);
+      } else if (step === 0) {
+        setQIdx(0);
+      }
+
+      setOneByOne(true);
+
+    } else {
+
+      if (step < 2) {
+        setStep(qIdx >= 20 ? 1 : 0);
+      }
+
+      setOneByOne(false);
+
+    }
+
+    toTop();
+
+  };
+
+
+  const current =
+    flat.length > 0
+      ? flat[Math.min(qIdx, flat.length - 1)]
+      : null;
+
+
+  const bandTitle =
+    oneByOne && step < 2
+      ? current?.sec === "k"
+        ? "防災行動力"
+        : "初動対応力"
+      : steps[step].title;
+
+
+  const bandSub =
+    oneByOne && step < 2
+      ? `設問 ${qIdx + 1} / ${flat.length}`
+      : steps[step].sub;
+
+
   return (
 
-    <div className="bs">
+    <div className={`bs${fontScale > 1 ? ` fs-${fontScale}` : ""}`}>
 
       <style>
         {CSS}
@@ -836,6 +1016,56 @@ export default function BosaiSurvey() {
               {"　"}
               {round.round_label}
             </p>
+          )}
+
+
+          {(phase === "intro" ||
+            phase === "survey" ||
+            phase === "sending") && (
+
+            <div className="bs-tools">
+
+              <div
+                className="bs-fs"
+                role="group"
+                aria-label="文字の大きさ"
+              >
+
+                <span className="bs-tools-k">
+                  文字の大きさ
+                </span>
+
+                {FONT_SIZES.map((o) => (
+
+                  <button
+                    key={o.v}
+                    type="button"
+                    aria-pressed={fontScale === o.v}
+                    onClick={() =>
+                      setFontScale(o.v)
+                    }
+                  >
+                    {o.label}
+                  </button>
+
+                ))}
+
+              </div>
+
+
+              <button
+                type="button"
+                className="bs-mode"
+                aria-pressed={oneByOne}
+                onClick={toggleMode}
+              >
+                {oneByOne
+                  ? "まとめて表示にする"
+                  : "1問ずつ表示にする"}
+              </button>
+
+            </div>
+
           )}
 
         </div>
@@ -1112,13 +1342,16 @@ export default function BosaiSurvey() {
               <div className="bs-prog-txt">
 
                 <span>
-                  {steps[step].title}
-                  （{step + 1}／
-                  {steps.length}）
+                  {bandTitle}
+                  {oneByOne && step < 2
+                    ? `（設問 ${qIdx + 1}／${flat.length}）`
+                    : `（${step + 1}／${steps.length}）`}
                 </span>
 
                 <span>
                   回答済み {answered} / 40問
+                  {remainMin > 0 &&
+                    `・残り約${remainMin}分`}
                 </span>
 
               </div>
@@ -1141,17 +1374,18 @@ export default function BosaiSurvey() {
             <div className="bs-band">
 
               <b>
-                {steps[step].title}
+                {bandTitle}
               </b>
 
               <span>
-                {steps[step].sub}
+                {bandSub}
               </span>
 
             </div>
 
 
-            {step === 0 &&
+            {!oneByOne &&
+              step === 0 &&
               S_CATS.map((cat) => (
 
                 <div
@@ -1242,7 +1476,8 @@ export default function BosaiSurvey() {
               ))}
 
 
-            {step === 1 &&
+            {!oneByOne &&
+              step === 1 &&
               K_CATS.map((cat) => (
 
                 <div
@@ -1294,6 +1529,104 @@ export default function BosaiSurvey() {
                 </div>
 
               ))}
+
+
+            {oneByOne &&
+              step < 2 &&
+              current && (
+
+              <div className="bs-card bs-one">
+
+                <p className="bs-one-pos">
+                  {current.sec === "s"
+                    ? "初動対応力"
+                    : "防災行動力"}
+                  ・{current.it.category}
+                  {"　"}
+                  設問 {qIdx + 1} / {flat.length}
+                </p>
+
+
+                {current.it.input_type === "quiz5"
+
+                  ? (
+
+                    <QuizBlock
+                      item={current.it}
+                      answers={
+                        quiz[current.it.item_no] ??
+                        Array(5).fill(null)
+                      }
+                      onChange={(qi, v) =>
+                        setQuiz((p) => {
+
+                          const n = {
+                            ...p,
+                            [current.it.item_no]: [
+                              ...(p[current.it.item_no] ??
+                                Array(5).fill(null)),
+                            ],
+                          };
+
+                          n[current.it.item_no][qi] = v;
+
+                          return n;
+
+                        })
+                      }
+                    />
+
+                  )
+
+                  : current.sec === "s"
+
+                    ? (
+
+                      <Question
+                        item={current.it}
+                        value={
+                          sSel[current.it.item_no - 1]
+                        }
+                        onChange={(v) =>
+                          setSSel((p) => {
+
+                            const n = [...p];
+
+                            n[current.it.item_no - 1] = v;
+
+                            return n;
+
+                          })
+                        }
+                      />
+
+                    )
+
+                    : (
+
+                      <Question
+                        item={current.it}
+                        value={
+                          kSel[current.it.item_no - 1]
+                        }
+                        onChange={(v) =>
+                          setKSel((p) => {
+
+                            const n = [...p];
+
+                            n[current.it.item_no - 1] = v;
+
+                            return n;
+
+                          })
+                        }
+                      />
+
+                    )}
+
+              </div>
+
+            )}
 
 
             {step === 2 && (
@@ -1360,6 +1693,22 @@ export default function BosaiSurvey() {
                       setMeta({
                         ...meta,
                         household_size: v,
+                      })
+                    }
+                  />
+
+
+                  <Select
+                    id="ry"
+                    label="今のお住まいでの居住年数"
+                    value={
+                      meta.residence_years
+                    }
+                    options={RESIDENCE}
+                    onChange={(v) =>
+                      setMeta({
+                        ...meta,
+                        residence_years: v,
                       })
                     }
                   />
@@ -1532,11 +1881,13 @@ export default function BosaiSurvey() {
 
             <div className="bs-actions">
 
-              {step > 0 && (
+              {(oneByOne
+                ? step === 2 || qIdx > 0
+                : step > 0) && (
 
                 <button
                   className="bs-btn ghost"
-                  onClick={back}
+                  onClick={goBack}
                 >
                   前へ戻る
                 </button>
@@ -1549,7 +1900,7 @@ export default function BosaiSurvey() {
 
                 <button
                   className="bs-btn"
-                  onClick={next}
+                  onClick={goNext}
                 >
                   次へ進む
                 </button>
@@ -2915,6 +3266,175 @@ const CSS = `
    transition:none!important;
  }
 
+}
+
+
+/* ------------------------------------------------------------
+   表示設定（文字の大きさ・1問ずつ表示）
+   ------------------------------------------------------------ */
+
+.bs-tools{
+ display:flex;
+ gap:14px;
+ flex-wrap:wrap;
+ align-items:center;
+ margin-top:14px;
+}
+
+.bs-tools-k{
+ font-size:12px;
+ letter-spacing:.14em;
+ opacity:.8;
+ margin-right:2px;
+}
+
+.bs-fs{
+ display:flex;
+ gap:6px;
+ align-items:center;
+ flex-wrap:wrap;
+}
+
+.bs-fs button,
+.bs-mode{
+ appearance:none;
+ font:inherit;
+ font-size:14px;
+ font-weight:700;
+ padding:7px 14px;
+ border-radius:6px;
+ border:2px solid rgba(255,255,255,.55);
+ background:transparent;
+ color:#fff;
+ cursor:pointer;
+ min-height:40px;
+}
+
+.bs-fs button:hover,
+.bs-mode:hover{
+ background:rgba(255,255,255,.16);
+}
+
+.bs-fs button[aria-pressed="true"],
+.bs-mode[aria-pressed="true"]{
+ background:#fff;
+ color:var(--green-d);
+ border-color:#fff;
+}
+
+.bs-fs button:focus-visible,
+.bs-mode:focus-visible{
+ outline:3px solid var(--amber);
+ outline-offset:2px;
+}
+
+/* ------------------------------------------------------------
+   1問ずつ表示
+   ------------------------------------------------------------ */
+
+.bs-one{
+ padding-top:8px;
+}
+
+.bs-one-pos{
+ font-size:13px;
+ letter-spacing:.1em;
+ color:var(--sub);
+ margin:0 0 4px;
+ font-weight:700;
+}
+
+.bs-one .bs-q{
+ border-bottom:0;
+ padding-bottom:4px;
+}
+
+/* ------------------------------------------------------------
+   文字の大きさ
+   本文は .bs の font-size を継承するので、
+   px指定になっている読みづらい箇所だけを個別に上げています
+   ------------------------------------------------------------ */
+
+.bs.fs-2{
+ font-size:19px;
+}
+
+.bs.fs-3{
+ font-size:22px;
+}
+
+.bs.fs-2 .bs-opt{
+ font-size:18px;
+ min-height:62px;
+}
+
+.bs.fs-3 .bs-opt{
+ font-size:21px;
+ min-height:70px;
+}
+
+.bs.fs-2 .bs-note{
+ font-size:16px;
+}
+
+.bs.fs-3 .bs-note{
+ font-size:18px;
+}
+
+.bs.fs-2 .bs-note.sm{
+ font-size:15px;
+}
+
+.bs.fs-3 .bs-note.sm{
+ font-size:17px;
+}
+
+.bs.fs-2 .bs-qcat{
+ font-size:13px;
+}
+
+.bs.fs-3 .bs-qcat{
+ font-size:15px;
+}
+
+.bs.fs-2 .bs-qno{
+ font-size:16px;
+ min-width:34px;
+ height:34px;
+}
+
+.bs.fs-3 .bs-qno{
+ font-size:18px;
+ min-width:38px;
+ height:38px;
+}
+
+.bs.fs-2 .bs-quizrow p,
+.bs.fs-2 .bs-field label,
+.bs.fs-2 .bs-field input,
+.bs.fs-2 .bs-field select,
+.bs.fs-2 .bs-btn{
+ font-size:18px;
+}
+
+.bs.fs-3 .bs-quizrow p,
+.bs.fs-3 .bs-field label,
+.bs.fs-3 .bs-field input,
+.bs.fs-3 .bs-field select,
+.bs.fs-3 .bs-btn{
+ font-size:21px;
+}
+
+.bs.fs-2 .bs-ox button{
+ min-width:56px;
+ min-height:56px;
+ font-size:22px;
+}
+
+.bs.fs-3 .bs-ox button{
+ min-width:64px;
+ min-height:64px;
+ font-size:26px;
 }
 
 `;

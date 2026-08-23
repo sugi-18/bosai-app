@@ -15,6 +15,7 @@ import { enterPaperResponse } from "./lib/bosai-supabase-api";
 const AGES = ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
 const SEX = ["男性", "女性", "その他"];
 const HOUSE = ["単身", "2人", "3人", "4人", "5人", "6人", "7人以上"];
+const RESIDENCE = ["1年未満", "1〜4年", "5〜9年", "10〜19年", "20年以上"];
 
 const blank = (v) => (v === "" || v === undefined ? null : v);
 
@@ -145,6 +146,7 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
           age_band: blank(meta.age_band),
           sex: blank(meta.sex),
           household_size: blank(meta.household_size),
+          residence_years: blank(meta.residence_years),
           certifications: blank(meta.certifications?.trim()),
           job_constraint: blank(meta.job_constraint?.trim()),
           health_constraint: blank(meta.health_constraint?.trim()),
@@ -267,6 +269,13 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
           <select id="pe-hh" value={meta.household_size ?? ""}
             onChange={(e) => setMeta({ ...meta, household_size: e.target.value })}>
             <option value="">—</option>{HOUSE.map((a) => <option key={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="dz-field">
+          <label htmlFor="pe-ry">居住年数</label>
+          <select id="pe-ry" value={meta.residence_years ?? ""}
+            onChange={(e) => setMeta({ ...meta, residence_years: e.target.value })}>
+            <option value="">—</option>{RESIDENCE.map((a) => <option key={a}>{a}</option>)}
           </select>
         </div>
       </div>
