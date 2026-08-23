@@ -25,6 +25,7 @@ import RespondentCards from "./RespondentCards";
 import ItemRanking from "./ItemRanking";
 import CrossTab from "./CrossTab";
 import ActionPlan from "./ActionPlan";
+import ReportSheet from "./ReportSheet";
 
 /* ============================================================
    定数・補助
@@ -607,6 +608,9 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                       cmpId={cmpId} focus={focus} />
 
                     <CrossTab roundId={cmpId} roundLabel={cmpRound.label} master={master} />
+
+                    <ReportSheet association={association} cmpRound={cmpRound}
+                      baseRound={baseRound} catRows={catRows} deltas={deltas} focus={focus} />
 
                     <div className="dz-card">
                       <h2>書き出し</h2>
