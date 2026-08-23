@@ -23,6 +23,7 @@ import PaperEntry from "./PaperEntry";
 import FreeTextPanel from "./FreeTextPanel";
 import RespondentCards from "./RespondentCards";
 import ItemRanking from "./ItemRanking";
+import CrossTab from "./CrossTab";
 
 /* ============================================================
    定数・補助
@@ -601,32 +602,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                         ))}
                     </div>
 
-                    {byAge.length > 0 && (
-                      <div className="dz-card">
-                        <h2>年代別の総合得点</h2>
-                        <p className="dz-muted">
-                          {cmpRound.label}。世代で差が出る場合、周知の手段を分ける判断材料になります。
-                        </p>
-                        <div style={{ width: "100%", height: 240, marginTop: 8 }}>
-                          <ResponsiveContainer>
-                            <BarChart data={byAge} margin={{ top: 10, right: 20, left: 0, bottom: 4 }}>
-                              <CartesianGrid stroke="#e6ebe7" vertical={false} />
-                              <XAxis dataKey="age" tick={{ fontSize: 13 }} />
-                              <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
-                              <Tooltip contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }}
-                                formatter={(v, n, p) => [`${v} 点（${p.payload.n}名）`, "平均総合点"]} />
-                              <ReferenceLine y={cmpTotal} stroke="#e0a12c" strokeDasharray="4 4"
-                                label={{ value: "全体平均", position: "right", fontSize: 11, fill: "#8a6a1e" }} />
-                              <Bar dataKey="平均総合点" radius={[4, 4, 0, 0]}>
-                                {byAge.map((d) => (
-                                  <Cell key={d.age} fill={d.平均総合点 >= cmpTotal ? "#00703c" : "#9aa8a0"} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    )}
+                    <CrossTab roundId={cmpId} roundLabel={cmpRound.label} master={master} />
 
                     <div className="dz-card">
                       <h2>書き出し</h2>
