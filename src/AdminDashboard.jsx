@@ -22,6 +22,7 @@ import {
 import PaperEntry from "./PaperEntry";
 import FreeTextPanel from "./FreeTextPanel";
 import RespondentCards from "./RespondentCards";
+import ItemRanking from "./ItemRanking";
 
 /* ============================================================
    定数・補助
@@ -578,6 +579,9 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                         </div>
                       </div>
                     )}
+
+                    <ItemRanking roundId={cmpId} roundLabel={cmpRound.label}
+                      master={master} baseAvg={baseAvg} baseLabel={baseRound?.label} />
 
                     <div className="dz-band"><b>次回への提案</b><span>2.0点未満の項目</span></div>
                     <div className="dz-card">
