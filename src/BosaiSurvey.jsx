@@ -39,6 +39,8 @@ import {
   isResidentCodeTaken,
 } from "./lib/bosai-supabase-api";
 
+import ResultImage from "./ResultImage";
+
 
 /* ============================================================
    定数
@@ -1966,6 +1968,7 @@ export default function BosaiSurvey() {
             master={master}
             result={result}
             areaAvg={areaAvg}
+            round={round}
           />
 
         )}
@@ -2256,6 +2259,7 @@ function Done({
   master,
   result,
   areaAvg,
+  round,
 }) {
 
   const kTotal =
@@ -2527,11 +2531,22 @@ function Done({
 
         <p className="bs-muted">
 
-          この画面は印刷して保存できます。
+          結果を手元に残しておきたい方は、
+          下のボタンからどうぞ。
           地域全体の集計結果は、
           後日自治会からお知らせします。
 
         </p>
+
+
+        <ResultImage
+          master={master}
+          result={result}
+          areaAvg={areaAvg}
+          roundLabel={round?.round_label}
+          assocName={round?.association_name}
+          weak={weak}
+        />
 
 
         <div className="bs-actions">
@@ -2542,10 +2557,21 @@ function Done({
               window.print()
             }
           >
-            結果を印刷する
+            この画面を印刷する
           </button>
 
         </div>
+
+
+        <p
+          className="bs-muted"
+          style={{ marginTop: 10 }}
+        >
+
+          スマートフォンでは印刷が使えないことがあります。
+          その場合は上の「結果を画像で保存する」をお使いください。
+
+        </p>
 
       </div>
 

@@ -647,6 +647,18 @@ export default function AdminDashboard() {
       <main className="dz-wrap">
         {err && <p className="dz-err card">{err}</p>}
 
+        {association && cmpId && (
+          <div className="dz-toolbar no-print">
+            <button className="dz-btn xs ghost" onClick={() => window.print()}>
+              画面全体を印刷
+            </button>
+            <span className="dz-sub">
+              いま画面に出ている内容をそのまま紙かPDFにします。
+              総会用に整えた資料は下の「総会用の印刷資料」からどうぞ。
+            </span>
+          </div>
+        )}
+
         {assocs.length === 0 && !err && (
           <AssociationManager association={null} onChanged={loadBase} />
         )}
@@ -811,7 +823,9 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                     <CrossTab roundId={cmpId} roundLabel={cmpRound.label} master={master} />
 
                     <ReportSheet association={association} cmpRound={cmpRound}
-                      baseRound={baseRound} catRows={catRows} deltas={deltas} focus={focus} />
+                      baseRound={baseRound} catRows={catRows} deltas={deltas} focus={focus}
+                      master={master} cmpAvg={cmpAvg} baseAvg={baseAvg}
+                      trend={baseId ? trend : []} />
 
                     <div className="dz-card">
                       <h2>書き出し</h2>
@@ -936,4 +950,22 @@ const CSS = `
 .dz-del{margin-left:auto;background:none;border:0;font:inherit;font-size:13px;font-weight:700;
  color:var(--red);text-decoration:underline;cursor:pointer;padding:8px;}
 .dz-del:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
+
+/* ---- 画面全体の印刷 ---- */
+.dz-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0 0;}
+.dz-toolbar .dz-sub{font-size:12px;color:var(--sub);}
+
+@media print{
+  .no-print{display:none!important;}
+  .dz-head,.dz-toolbar,.dz-actions,.dz-newround,.dz-editbox{display:none!important;}
+  .dz-btn,.dz-link,.dz-del,.dz-ops,.dz-field,.dz-sel{display:none!important;}
+  .ir-controls,.ct-controls,.ap-tabs,.ap-focus,.rc-bar,.re-actions{display:none!important;}
+  .dz{background:#fff!important;}
+  .dz-wrap{max-width:none!important;padding:0!important;}
+  .dz-card,.dz-chart,.dz-kpis,.dz-band{break-inside:avoid;page-break-inside:avoid;
+   box-shadow:none!important;border:1px solid #d3dbd5!important;}
+  .dz-scroll{overflow:visible!important;}
+  .dz-table{font-size:10px!important;}
+  @page{size:A4 portrait;margin:12mm;}
+}
 `;
