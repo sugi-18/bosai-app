@@ -12,7 +12,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Legend, Tooltip,
 } from "recharts";
-import { supabase } from "./lib/bosai-supabase-api";
+import { supabase, printElement } from "./lib/bosai-supabase-api";
 import RespondentEdit from "./RespondentEdit";
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -162,7 +162,7 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdi
   ].filter(([, v]) => (v ?? "").trim() !== "");
 
   return (
-    <div className="rc-card">
+    <div className="rc-card" id="rc-print">
       <div className="rc-head no-print">
         <div className="rc-nav">
           <button className="dz-btn xs ghost" onClick={onClose}>一覧に戻る</button>
@@ -171,7 +171,7 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdi
         </div>
         <div className="rc-nav">
           <button className="dz-btn xs ghost" onClick={onEdit}>回答を修正</button>
-          <button className="dz-btn xs" onClick={() => window.print()}>この個票を印刷</button>
+          <button className="dz-btn xs" onClick={() => printElement("#rc-print")}>この個票を印刷</button>
         </div>
       </div>
 

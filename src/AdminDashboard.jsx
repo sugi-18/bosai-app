@@ -957,13 +957,42 @@ const CSS = `
 
 @media print{
   .no-print{display:none!important;}
-  .dz-head,.dz-toolbar,.dz-actions,.dz-newround,.dz-editbox{display:none!important;}
-  .dz-btn,.dz-link,.dz-del,.dz-ops,.dz-field,.dz-sel{display:none!important;}
-  .ir-controls,.ct-controls,.ap-tabs,.ap-focus,.rc-bar,.re-actions{display:none!important;}
+
+  /* ---- 画面全体を印刷するとき ---- */
+  body:not(.printing-one) .dz-head,
+  body:not(.printing-one) .dz-toolbar,
+  body:not(.printing-one) .dz-actions,
+  body:not(.printing-one) .dz-newround,
+  body:not(.printing-one) .dz-editbox{display:none!important;}
+  body:not(.printing-one) .dz-btn,
+  body:not(.printing-one) .dz-link,
+  body:not(.printing-one) .dz-del,
+  body:not(.printing-one) .dz-ops,
+  body:not(.printing-one) .dz-field,
+  body:not(.printing-one) .dz-sel{display:none!important;}
+  body:not(.printing-one) .ir-controls,
+  body:not(.printing-one) .ct-controls,
+  body:not(.printing-one) .ap-tabs,
+  body:not(.printing-one) .ap-focus,
+  body:not(.printing-one) .rc-bar,
+  body:not(.printing-one) .re-actions{display:none!important;}
+  body:not(.printing-one) .dz-card,
+  body:not(.printing-one) .dz-chart,
+  body:not(.printing-one) .dz-kpis,
+  body:not(.printing-one) .dz-band{break-inside:avoid;page-break-inside:avoid;
+   box-shadow:none!important;border:1px solid #d3dbd5!important;}
+
+  /* ---- 個票や総会資料など、一部分だけを印刷するとき ---- */
+  body.printing-one{overflow:visible!important;}
+  body.printing-one *{visibility:hidden!important;}
+  body.printing-one .print-target,
+  body.printing-one .print-target *{visibility:visible!important;}
+  body.printing-one .print-target{position:absolute!important;left:0;top:0;
+   width:100%!important;margin:0!important;}
+  body.printing-one .print-target .no-print{display:none!important;}
+
   .dz{background:#fff!important;}
   .dz-wrap{max-width:none!important;padding:0!important;}
-  .dz-card,.dz-chart,.dz-kpis,.dz-band{break-inside:avoid;page-break-inside:avoid;
-   box-shadow:none!important;border:1px solid #d3dbd5!important;}
   .dz-scroll{overflow:visible!important;}
   .dz-table{font-size:10px!important;}
   @page{size:A4 portrait;margin:12mm;}

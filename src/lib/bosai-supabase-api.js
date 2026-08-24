@@ -177,13 +177,22 @@ export async function getMyAssociations() {
 
 /** 調査回の一覧とサマリ（回答数・回答率・平均点） */
 export async function getRoundSummaries(associationId) {
-  const { data, error } = await supabase
-    .from("v_round_summary")
-    .select("*")
-    .eq("association_id", associationId)
-    .order("sequence");
+  /*
+   * 集計ビュー v_round_summary には合言葉（access_code）が含まれていません。
+   * 集計用のビューに合言葉を混ぜると、閲覧権限を分けたくなったときに
+   * 困るためです。回答URLの組み立てに必要なので、
+   * ここで元のテーブルから引いて合わせています。
+   */
+  const [{ data, error }, { data: codes, error: e2 }] = await Promise.all([
+    supabase.from("v_round_summary").select("*")
+      .eq("association_id", associationId).order("sequence"),
+    supabase.from("survey_rounds").select("id,access_code")
+      .eq("association_id", associationId),
+  ]);
   if (error) throw error;
-  return data;
+  if (e2) throw e2;
+  const byId = Object.fromEntries((codes ?? []).map((c) => [c.id, c.access_code]));
+  return (data ?? []).map((r) => ({ ...r, access_code: byId[r.round_id] ?? null }));
 }
 
 /** 指定した調査回の項目別平均（40件） */
@@ -352,6 +361,32 @@ export function toCsv(rows, header) {
   const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const body = [header, ...rows].map((r) => r.map(esc).join(",")).join("\r\n");
   return new Blob(["\uFEFF" + body], { type: "text/csv;charset=utf-8" });
+}
+
+/**
+ * 指定した部分だけを印刷する。
+ *
+ * 画面全体の印刷と、個票や総会資料など「一部分だけ」の印刷が
+ * 同じ window.print() を共有しているため、印刷したい要素に目印を付け、
+ * その間だけ body に印。CSS側でその印を見て、対象以外を隠します。
+ */
+export function printElement(selector) {
+  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) { window.print(); return; }
+
+  const clear = () => {
+    el.classList.remove("print-target");
+    document.body.classList.remove("printing-one");
+  };
+
+  el.classList.add("print-target");
+  document.body.classList.add("printing-one");
+
+  window.addEventListener("afterprint", clear, { once: true });
+  /* afterprint が来ない環境向けの保険 */
+  window.addEventListener("focus", clear, { once: true });
+
+  window.print();
 }
 
 export function download(blob, filename) {

@@ -11,7 +11,7 @@
  * 印刷時に潰れたり切れたりしやすいためです。
  */
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase } from "./lib/bosai-supabase-api";
+import { supabase, printElement } from "./lib/bosai-supabase-api";
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const fmtDelta = (d) => (d > 0 ? `+${Number(d).toFixed(2)}` : Number(d).toFixed(2));
@@ -429,16 +429,16 @@ export default function ReportSheet({
   if (!association || !cmpRound) return null;
 
   return (
-    <div className="dz-card no-print">
+    <div className="dz-card">
       <style>{RS_CSS}</style>
       {open && <style>{RS_PRINT_CSS}</style>}
 
-      <h2>総会用の印刷資料</h2>
-      <p className="dz-muted">
+      <h2 className="no-print">総会用の印刷資料</h2>
+      <p className="dz-muted no-print">
         A4縦にまとめて印刷できます。取り組みや推移がある場合は自動で裏面（2枚目）に続きます。
         印刷画面で「送信先」を「PDFに保存」にすれば、そのまま配布用のPDFになります。
       </p>
-      <div className="dz-actions">
+      <div className="dz-actions no-print">
         <button className="dz-btn" onClick={() => setOpen(true)}>印刷資料を開く</button>
       </div>
 
@@ -447,7 +447,7 @@ export default function ReportSheet({
           <div className="rs-bar-top">
             <span className="rs-bar-title">印刷プレビュー（A4縦）</span>
             <div className="rs-bar-ops">
-              <button className="dz-btn" onClick={() => window.print()}>印刷／PDFに保存</button>
+              <button className="dz-btn" onClick={() => printElement("#bosai-sheet")}>印刷／PDFに保存</button>
               <button className="dz-btn xs ghost light" onClick={() => setOpen(false)}>閉じる</button>
             </div>
           </div>
@@ -592,14 +592,12 @@ const RS_CSS = `
    ============================================================ */
 const RS_PRINT_CSS = `
 @media print{
-  body *{visibility:hidden!important;}
-  #bosai-sheet,#bosai-sheet *{visibility:visible!important;}
-  #bosai-sheet{position:absolute!important;left:0;top:0;width:210mm!important;
-   margin:0!important;padding:0!important;}
+  /* 対象以外を隠すのは共通のしくみに任せ、ここは体裁だけを整える */
   .rs-overlay{position:static!important;background:none!important;padding:0!important;
-   overflow:visible!important;}
+   overflow:visible!important;display:block!important;}
   .rs-bar-top,.rs-tip{display:none!important;}
   .rs-stage{padding:0!important;display:block!important;}
+  #bosai-sheet{width:210mm!important;padding:0!important;}
   .rs-sheet{width:210mm!important;min-height:0!important;height:auto!important;
    margin:0!important;padding:0!important;box-shadow:none!important;
    break-after:page;page-break-after:always;}
