@@ -271,6 +271,60 @@ export async function setRoundStatus(roundId, status) {
   if (error) throw error;
 }
 
+/** 調査回の内容を書き換える（名称・実施日・区分・合言葉など） */
+export async function updateRound(roundId, patch) {
+  const { error } = await supabase.from("survey_rounds").update(patch).eq("id", roundId);
+  if (error) throw error;
+}
+
+/** 調査回を削除する。ぶら下がる回答もすべて消えます */
+export async function deleteRound(roundId) {
+  const { error } = await supabase.from("survey_rounds").delete().eq("id", roundId);
+  if (error) throw error;
+}
+
+/** 回答者の属性を書き換える */
+export async function updateRespondent(respondentId, patch) {
+  const { error } = await supabase.from("respondents").update(patch).eq("id", respondentId);
+  if (error) throw error;
+}
+
+/** 回答者を削除する。その人の40項目の回答もすべて消えます */
+export async function deleteRespondent(respondentId) {
+  const { error } = await supabase.from("respondents").delete().eq("id", respondentId);
+  if (error) throw error;
+}
+
+/**
+ * 回答の点数を書き換える。
+ * rows は [{ section, item_no, score, choice_index, quiz_correct }] の形。
+ * 既にある行を上書きするので、直したい項目だけ渡せば足ります。
+ */
+export async function updateAnswers(respondentId, rows) {
+  const payload = rows.map((r) => ({ ...r, respondent_id: respondentId }));
+  const { error } = await supabase
+    .from("answers")
+    .upsert(payload, { onConflict: "respondent_id,section,item_no" });
+  if (error) throw error;
+}
+
+/** 自治会を新しく作る。実行した人がそのまま管理者になります */
+export async function createAssociation({ name, municipality, householdCount }) {
+  const { data, error } = await supabase.rpc("create_association", {
+    p_name: name,
+    p_municipality: municipality ?? null,
+    p_household_count: householdCount ?? null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** 自治会の名称などを書き換える */
+export async function updateAssociation(associationId, patch) {
+  const { error } = await supabase.from("associations").update(patch).eq("id", associationId);
+  if (error) throw error;
+}
+
 /** 紙で回答された分の代理入力（管理者権限で直接insert） */
 export async function enterPaperResponse({ roundId, meta, answers }) {
   const { data: r, error: e1 } = await supabase

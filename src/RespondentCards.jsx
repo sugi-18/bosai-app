@@ -13,6 +13,7 @@ import {
   ResponsiveContainer, Legend, Tooltip,
 } from "recharts";
 import { supabase } from "./lib/bosai-supabase-api";
+import RespondentEdit from "./RespondentEdit";
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -21,7 +22,8 @@ const sum = (a) => a.reduce((x, y) => x + y, 0);
 async function fetchRoster(roundId) {
   const [{ data: people, error: e1 }, { data: totals, error: e2 }] = await Promise.all([
     supabase.from("respondents")
-      .select("id,resident_code,member_type,age_band,sex,household_size,entry_mode,submitted_at," +
+      .select("id,resident_code,member_type,age_band,sex,household_size,residence_years," +
+              "entry_mode,submitted_at," +
               "certifications,job_constraint,health_constraint,learning_interest")
       .eq("round_id", roundId),
     supabase.from("v_respondent_totals")
@@ -45,7 +47,7 @@ async function fetchAnswers(respondentId) {
 }
 
 /* ---------- 個票 ---------- */
-function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext }) {
+function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdit }) {
   const pick = (section, no) => answers.find((a) => a.section === section && a.item_no === no);
 
   const scores = useMemo(() => ({
@@ -149,7 +151,7 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext }) {
 
   const attrs = [
     ["立場", person.member_type], ["年齢", person.age_band], ["性別", person.sex],
-    ["世帯人数", person.household_size],
+    ["世帯人数", person.household_size], ["居住年数", person.residence_years],
     ["入力方法", person.entry_mode === "paper" ? "紙（代理入力）" : "Web"],
   ].filter(([, v]) => v);
 
@@ -167,7 +169,10 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext }) {
           <button className="dz-btn xs ghost" onClick={onPrev} disabled={!onPrev}>← 前の人</button>
           <button className="dz-btn xs ghost" onClick={onNext} disabled={!onNext}>次の人 →</button>
         </div>
-        <button className="dz-btn xs" onClick={() => window.print()}>この個票を印刷</button>
+        <div className="rc-nav">
+          <button className="dz-btn xs ghost" onClick={onEdit}>回答を修正</button>
+          <button className="dz-btn xs" onClick={() => window.print()}>この個票を印刷</button>
+        </div>
       </div>
 
       <div className="rc-title">
@@ -232,7 +237,7 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext }) {
 /* ============================================================
    本体
    ============================================================ */
-export default function RespondentCards({ roundId, roundLabel, master, areaAvg }) {
+export default function RespondentCards({ roundId, roundLabel, master, areaAvg, onChanged }) {
   const [roster, setRoster] = useState([]);
   const [sel, setSel] = useState(null);          // 選択中のindex
   const [answers, setAnswers] = useState([]);
@@ -240,6 +245,8 @@ export default function RespondentCards({ roundId, roundLabel, master, areaAvg }
   const [sort, setSort] = useState("code");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,7 +260,7 @@ export default function RespondentCards({ roundId, roundLabel, master, areaAvg }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [roundId]);
+  }, [roundId, reloadKey]);
 
   const view = useMemo(() => {
     const f = roster.filter((p) =>
@@ -267,7 +274,7 @@ export default function RespondentCards({ roundId, roundLabel, master, areaAvg }
   }, [roster, q, sort]);
 
   const openAt = async (i) => {
-    setSel(i); setErr("");
+    setSel(i); setEditing(false); setErr("");
     try { setAnswers(await fetchAnswers(view[i].id)); }
     catch (e) { setErr(e.message); }
   };
@@ -332,6 +339,19 @@ export default function RespondentCards({ roundId, roundLabel, master, areaAvg }
             </div>
           )}
         </>
+      ) : editing && view[sel] ? (
+        <RespondentEdit
+          person={view[sel]}
+          answers={answers}
+          master={master}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            setSel(null);
+            setReloadKey((k) => k + 1);
+            onChanged?.();
+          }}
+        />
       ) : (
         <Card
           person={view[sel]}
@@ -339,6 +359,7 @@ export default function RespondentCards({ roundId, roundLabel, master, areaAvg }
           master={master}
           areaAvg={areaAvg}
           onClose={() => setSel(null)}
+          onEdit={() => setEditing(true)}
           onPrev={sel > 0 ? () => openAt(sel - 1) : null}
           onNext={sel < view.length - 1 ? () => openAt(sel + 1) : null}
         />

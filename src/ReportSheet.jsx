@@ -71,10 +71,7 @@ function Sheet({ association, cmpRound, baseRound, catRows, focus, up, actions }
         <div className="rs-headmeta">
           <b>{cmpRound.label}</b>
           <span>実施 {cmpRound.conducted_on}</span>
-          <span>
-            回答 {cmpRound.respondents ?? 0}名
-            {cmpRound.response_rate ? `（回答率 ${cmpRound.response_rate}%）` : ""}
-          </span>
+          <span>回答 {cmpRound.respondents ?? 0}名</span>
         </div>
       </header>
 
@@ -236,6 +233,7 @@ export default function ReportSheet({ association, cmpRound, baseRound, catRows,
   return (
     <div className="dz-card">
       <style>{RS_CSS}</style>
+      {open && <style>{RS_PRINT_CSS}</style>}
       <h2>総会用の1枚レポート</h2>
       <p className="dz-muted">
         ここまでの集計を、A4縦1枚に収めた形で印刷できます。
@@ -366,7 +364,16 @@ const RS_CSS = `
   .rs-cols{grid-template-columns:1fr;gap:12px;}
 }
 
-/* ---- 印刷 ---- */
+`;
+
+
+/* ============================================================
+   印刷用のスタイル
+   1枚レポートを開いている間だけ読み込みます。
+   常に読み込んでいると、個票の印刷や画面全体の印刷まで
+   このシート以外が消えてしまうためです。
+   ============================================================ */
+const RS_PRINT_CSS = `
 @media print{
   body *{visibility:hidden!important;}
   #bosai-sheet,#bosai-sheet *{visibility:visible!important;}
@@ -378,6 +385,6 @@ const RS_CSS = `
   .rs-stage{padding:0!important;}
   .rs-cols{grid-template-columns:1fr 1fr!important;}
   .rs-sec,.rs-table,.rs-bar,.rs-focus li{break-inside:avoid;}
+  @page{size:A4 portrait;margin:12mm;}
 }
-@page{size:A4 portrait;margin:12mm;}
 `;

@@ -17,7 +17,8 @@ import {
 import {
   signIn, signOut, getSession, onAuthChange, withClockSkewRetry,
   getMyAssociations, getRoundSummaries, getItemAverages, getTotalsByAttribute,
-  getItemMaster, createRound, setRoundStatus,
+  getItemMaster, createRound, setRoundStatus, updateRound, deleteRound,
+  createAssociation, updateAssociation,
 } from "./lib/bosai-supabase-api";
 import PaperEntry from "./PaperEntry";
 import FreeTextPanel from "./FreeTextPanel";
@@ -150,6 +151,100 @@ function CompareRadar({ title, items, a, b, aName, bName }) {
 }
 
 /* ============================================================
+   自治会の管理
+   ============================================================ */
+function AssociationManager({ association, onChanged }) {
+  const [name, setName] = useState("");
+  const [muni, setMuni] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const add = async () => {
+    if (!name.trim()) return;
+    setBusy(true); setMsg("");
+    try {
+      await createAssociation({ name: name.trim(), municipality: muni.trim() || null });
+      setMsg(`「${name.trim()}」を作成しました。上の「自治会」から切り替えられます。`);
+      setName(""); setMuni(""); setAdding(false);
+      onChanged();
+    } catch (e) { setMsg(`作成できませんでした：${e.message}`); }
+    finally { setBusy(false); }
+  };
+
+  const rename = async () => {
+    if (!newName.trim()) return;
+    setBusy(true); setMsg("");
+    try {
+      await updateAssociation(association.id, { name: newName.trim() });
+      setMsg("名称を変更しました。");
+      setRenaming(false);
+      onChanged();
+    } catch (e) { setMsg(`変更できませんでした：${e.message}`); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="dz-card">
+      <h2>自治会の管理</h2>
+      <p className="dz-muted">
+        自治会ごとに調査回・回答・改善の取り組みが分かれます。
+        画面上部の「自治会」で切り替えてください。
+      </p>
+
+      {msg && <p className="dz-note">{msg}</p>}
+
+      {renaming ? (
+        <div className="dz-newround" style={{ marginTop: 12 }}>
+          <div className="dz-field" style={{ flex: "2 1 240px" }}>
+            <label htmlFor="an">名称</label>
+            <input id="an" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <button className="dz-btn" disabled={busy || !newName.trim()} onClick={rename}>保存</button>
+          <button className="dz-btn ghost" disabled={busy} onClick={() => setRenaming(false)}>やめる</button>
+        </div>
+      ) : adding ? (
+        <div className="dz-editbox">
+          <h3>新しい自治会を作る</h3>
+          <div className="dz-newround">
+            <div className="dz-field" style={{ flex: "2 1 240px" }}>
+              <label htmlFor="na">名称</label>
+              <input id="na" value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="例）〇〇自治会" />
+            </div>
+            <div className="dz-field" style={{ flex: "1 1 180px" }}>
+              <label htmlFor="nm">市町村（任意）</label>
+              <input id="nm" value={muni} onChange={(e) => setMuni(e.target.value)} />
+            </div>
+          </div>
+          <p className="dz-muted" style={{ marginTop: 6 }}>
+            作成すると、ログイン中のこのアカウントがその自治会の管理者になります。
+            調査回はまだ無いので、作成後に下の「調査回の管理」から作ってください。
+          </p>
+          <div className="dz-actions">
+            <button className="dz-btn" disabled={busy || !name.trim()} onClick={add}>作成</button>
+            <button className="dz-btn ghost" disabled={busy} onClick={() => setAdding(false)}>やめる</button>
+          </div>
+        </div>
+      ) : (
+        <div className="dz-actions">
+          <button className="dz-btn ghost" onClick={() => setAdding(true)}>自治会を追加</button>
+          {association && (
+            <button className="dz-btn ghost"
+              onClick={() => { setNewName(association.name); setRenaming(true); }}>
+              名称を変更
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ============================================================
    調査回の運用パネル
    ============================================================ */
 function RoundManager({ association, rounds, onChanged }) {
@@ -157,6 +252,8 @@ function RoundManager({ association, rounds, onChanged }) {
   const [phase, setPhase] = useState("baseline");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [draft, setDraft] = useState({ label: "", phase: "baseline", conducted_on: "", access_code: "" });
 
   const surveyBase = `${window.location.origin}${window.location.pathname.replace(/admin\.html$/, "")}`;
 
@@ -178,6 +275,54 @@ function RoundManager({ association, rounds, onChanged }) {
       await setRoundStatus(round.round_id, round.status === "open" ? "closed" : "open");
       onChanged();
     } catch (e) { setMsg(`変更できませんでした：${e.message}`); }
+    finally { setBusy(false); }
+  };
+
+  /* ---- 編集 ---- */
+  const startEdit = (r) => {
+    setMsg("");
+    setEditId(r.round_id);
+    setDraft({
+      label: r.label ?? "",
+      phase: r.phase ?? "baseline",
+      conducted_on: r.conducted_on ?? "",
+      access_code: r.access_code ?? "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!draft.label.trim()) return;
+    setBusy(true); setMsg("");
+    try {
+      await updateRound(editId, {
+        label: draft.label.trim(),
+        phase: draft.phase,
+        conducted_on: draft.conducted_on || null,
+        access_code: draft.access_code.trim(),
+      });
+      setEditId(null);
+      setMsg("調査回を書き換えました。");
+      onChanged();
+    } catch (e) {
+      setMsg(e.message?.includes("survey_rounds_access_code_key")
+        ? "その合言葉は他の調査回で使われています。別の文字にしてください。"
+        : `書き換えできませんでした：${e.message}`);
+    } finally { setBusy(false); }
+  };
+
+  const removeRound = async (r) => {
+    const n = r.respondents ?? 0;
+    const warn = n > 0
+      ? `「${r.label}」を削除します。\n\nこの回の回答 ${n}件 もすべて消えます。\n元に戻せません。本当によろしいですか？`
+      : `「${r.label}」を削除します。元に戻せません。よろしいですか？`;
+    if (!window.confirm(warn)) return;
+    if (n > 0 && !window.confirm(`確認のためもう一度おたずねします。\n${n}件の回答を削除してよろしいですか？`)) return;
+    setBusy(true); setMsg("");
+    try {
+      await deleteRound(r.round_id);
+      setMsg(`「${r.label}」を削除しました。`);
+      onChanged();
+    } catch (e) { setMsg(`削除できませんでした：${e.message}`); }
     finally { setBusy(false); }
   };
 
@@ -209,9 +354,15 @@ function RoundManager({ association, rounds, onChanged }) {
                       : <span className="dz-sub">—</span>}
                   </td>
                   <td>
-                    <button className="dz-btn xs ghost" disabled={busy} onClick={() => toggle(r)}>
-                      {r.status === "open" ? "受付を終了" : "受付を開始"}
-                    </button>
+                    <div className="dz-ops">
+                      <button className="dz-btn xs ghost" disabled={busy} onClick={() => toggle(r)}>
+                        {r.status === "open" ? "受付を終了" : "受付を開始"}
+                      </button>
+                      <button className="dz-btn xs ghost" disabled={busy}
+                        onClick={() => (editId === r.round_id ? setEditId(null) : startEdit(r))}>
+                        {editId === r.round_id ? "閉じる" : "編集"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -219,6 +370,53 @@ function RoundManager({ association, rounds, onChanged }) {
           </tbody>
         </table>
       </div>
+
+      {editId && (
+        <div className="dz-editbox">
+          <h3>調査回を編集</h3>
+          <div className="dz-newround">
+            <div className="dz-field" style={{ flex: "2 1 240px" }}>
+              <label htmlFor="er-l">名称</label>
+              <input id="er-l" value={draft.label}
+                onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
+            </div>
+            <div className="dz-field" style={{ flex: "1 1 170px" }}>
+              <label htmlFor="er-p">区分</label>
+              <select id="er-p" value={draft.phase}
+                onChange={(e) => setDraft({ ...draft, phase: e.target.value })}>
+                <option value="baseline">現時点評価（取組み前）</option>
+                <option value="follow_up">取組み後評価</option>
+              </select>
+            </div>
+            <div className="dz-field" style={{ flex: "1 1 150px" }}>
+              <label htmlFor="er-d">実施日</label>
+              <input id="er-d" type="date" value={draft.conducted_on ?? ""}
+                onChange={(e) => setDraft({ ...draft, conducted_on: e.target.value })} />
+            </div>
+            <div className="dz-field" style={{ flex: "1 1 150px" }}>
+              <label htmlFor="er-c">合言葉</label>
+              <input id="er-c" value={draft.access_code}
+                onChange={(e) => setDraft({ ...draft, access_code: e.target.value })} />
+            </div>
+          </div>
+          <p className="dz-muted" style={{ marginTop: 6 }}>
+            合言葉を変えると、これまで配った回答URLは使えなくなります。
+            大文字小文字は区別しません。
+          </p>
+          <div className="dz-actions">
+            <button className="dz-btn" disabled={busy || !draft.label.trim()} onClick={saveEdit}>
+              保存
+            </button>
+            <button className="dz-btn ghost" disabled={busy} onClick={() => setEditId(null)}>
+              やめる
+            </button>
+            <button className="dz-del" disabled={busy}
+              onClick={() => removeRound(rounds.find((x) => x.round_id === editId))}>
+              この調査回を削除
+            </button>
+          </div>
+        </div>
+      )}
 
       <h3>新しい調査回を作る</h3>
       <div className="dz-newround">
@@ -419,7 +617,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="dz-sel">
-            {assocs.length > 1 && (
+            {assocs.length > 0 && (
               <div>
                 <label htmlFor="as">自治会</label>
                 <select id="as" value={assocId} onChange={(e) => setAssocId(e.target.value)}>
@@ -450,6 +648,10 @@ export default function AdminDashboard() {
         {err && <p className="dz-err card">{err}</p>}
 
         {assocs.length === 0 && !err && (
+          <AssociationManager association={null} onChanged={loadBase} />
+        )}
+
+        {false && (
           <div className="dz-card">
             <h2>担当する自治会が見つかりません</h2>
             <p>ログインはできていますが、このアカウントはどの自治会にも紐付いていません。
@@ -475,9 +677,6 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                 <div className="dz-kpis">
                   <Kpi label="回答数" value={cmpRound.respondents ?? 0} unit="名"
                     delta={baseRound ? (cmpRound.respondents ?? 0) - (baseRound.respondents ?? 0) : undefined} />
-                  <Kpi label="回答率" value={cmpRound.response_rate ?? "—"} unit={cmpRound.response_rate ? "%" : ""}
-                    delta={baseRound && cmpRound.response_rate && baseRound.response_rate
-                      ? r2(cmpRound.response_rate - baseRound.response_rate) : undefined} />
                   <Kpi label="防災行動力" value={Number(cmpRound.koudou_avg ?? 0).toFixed(1)} unit="/100"
                     delta={baseRound ? r2(cmpRound.koudou_avg - baseRound.koudou_avg) : undefined} />
                   <Kpi label="初動対応力" value={Number(cmpRound.shodou_avg ?? 0).toFixed(1)} unit="/100"
@@ -488,7 +687,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
 
                 {loading && <p className="dz-muted" style={{ marginTop: 12 }}>集計しています…</p>}
 
-                {trend.length >= 2 && (
+                {baseId && trend.length >= 2 && (
                   <>
                     <div className="dz-band"><b>推移</b><span>回答のあった調査回すべて</span></div>
                     <div className="dz-chart" style={{ marginTop: 16, padding: "16px 12px 8px" }}>
@@ -629,9 +828,12 @@ from associations a where a.name = '〇〇自治会';`}</pre>
               </>
             )}
 
-          　<RespondentCards roundId={cmpId} roundLabel={cmpRound?.label} master={master} areaAvg={cmpAvg} />
+          　<RespondentCards roundId={cmpId} roundLabel={cmpRound?.label} master={master}
+            areaAvg={cmpAvg} onChanged={loadRounds} />
             <FreeTextPanel roundId={cmpId} roundLabel={cmpRound?.label} />
             <PaperEntry association={association} rounds={rounds} master={master} onSaved={loadRounds} />
+            <AssociationManager association={association} onChanged={loadBase} />
+
             <RoundManager association={association} rounds={rounds} onChanged={loadRounds} />
           </>
         )}
@@ -726,4 +928,12 @@ const CSS = `
 .dz-field select:focus,.dz-link:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
 @media (max-width:600px){.dz-kpi .v{font-size:27px;}.dz-title{font-size:19px;}}
 @media (prefers-reduced-motion:reduce){.dz *{transition:none!important;}}
+
+/* ---- 追加分：編集まわり ---- */
+.dz-ops{display:flex;gap:6px;flex-wrap:wrap;}
+.dz-editbox{margin-top:18px;padding:16px;background:var(--paper);border-radius:8px;}
+.dz-editbox h3{margin:0 0 4px;font-size:15px;font-weight:800;}
+.dz-del{margin-left:auto;background:none;border:0;font:inherit;font-size:13px;font-weight:700;
+ color:var(--red);text-decoration:underline;cursor:pointer;padding:8px;}
+.dz-del:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
 `;

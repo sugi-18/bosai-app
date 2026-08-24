@@ -863,11 +863,25 @@ export default function BosaiSurvey() {
   ];
 
 
-  const toTop = () =>
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+  const toTop = () => {
+
+    /* いま描かれている内容が入れ替わったあとで先頭に戻す。
+       スマートフォンでは、描画前にスクロールを始めると
+       元の位置に引き戻されてしまうため二段構えにしている */
+
+    const jump = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    jump();
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(jump);
+    }
+
+  };
 
 
   const next = () => {
@@ -967,6 +981,12 @@ export default function BosaiSurvey() {
     toTop();
 
   };
+
+
+  useEffect(() => {
+    toTop();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [step, qIdx, phase]);
 
 
   const current =
