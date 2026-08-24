@@ -15,7 +15,7 @@ import {
   ResponsiveContainer, Legend, Tooltip, Cell, ReferenceLine,
 } from "recharts";
 import {
-  signIn, signOut, getSession, onAuthChange,
+  signIn, signOut, getSession, onAuthChange, withClockSkewRetry,
   getMyAssociations, getRoundSummaries, getItemAverages, getTotalsByAttribute,
   getItemMaster, createRound, setRoundStatus,
 } from "./lib/bosai-supabase-api";
@@ -268,7 +268,9 @@ export default function AdminDashboard() {
   const loadBase = useCallback(async () => {
     setErr("");
     try {
-      const [a, m] = await Promise.all([getMyAssociations(), getItemMaster()]);
+      const [a, m] = await withClockSkewRetry(
+        () => Promise.all([getMyAssociations(), getItemMaster()])
+      );
       setAssocs(a);
       setMaster(m);
       if (a.length) setAssocId((prev) => prev || a[0].id);
@@ -282,7 +284,7 @@ export default function AdminDashboard() {
     if (!assocId) return;
     setErr("");
     try {
-      const rs = await getRoundSummaries(assocId);
+      const rs = await withClockSkewRetry(() => getRoundSummaries(assocId));
       setRounds(rs);
       const withData = rs.filter((r) => (r.respondents ?? 0) > 0);
       if (withData.length >= 2) {
@@ -303,11 +305,11 @@ export default function AdminDashboard() {
       if (!cmpId) { setCmpAvg(null); setBaseAvg(null); setAgeRows([]); return; }
       setLoading(true); setErr("");
       try {
-        const [cRows, bRows, totals] = await Promise.all([
+        const [cRows, bRows, totals] = await withClockSkewRetry(() => Promise.all([
           getItemAverages(cmpId),
           baseId ? getItemAverages(baseId) : Promise.resolve(null),
           getTotalsByAttribute(cmpId),
-        ]);
+        ]));
         if (cancelled) return;
         setCmpAvg({ k: toArray(cRows, "koudou"), s: toArray(cRows, "shodou") });
         setBaseAvg(bRows ? { k: toArray(bRows, "koudou"), s: toArray(bRows, "shodou") } : null);

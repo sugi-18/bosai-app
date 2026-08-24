@@ -15,6 +15,37 @@ export const supabase = createClient(
 );
 
 /* ============================================================
+   時計のずれによる一時的なエラーへの対処
+
+   Supabase側で、ログイン発行サーバー（Auth）とデータ取得サーバー
+   （PostgREST）の時計が数秒ずれていると、発行されたばかりの
+   ログイン情報が「未来の時刻で発行されている」として弾かれ、
+   "JWT issued at future" というエラーになります。
+   ずれは通常数秒なので、少し待って呼び直せば通ります。
+
+   根本的にはSupabase側の問題なので、頻発する場合は
+   プロジェクトの再起動やサポートへの連絡が必要です。
+   ============================================================ */
+
+const CLOCK_SKEW = /issued at future|PGRST30[13]/i;
+
+/** 時計のずれで失敗したときだけ、少し待って呼び直す */
+export async function withClockSkewRetry(fn, tries = 3) {
+  let last;
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      if (!CLOCK_SKEW.test(e?.message ?? "")) throw e;
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
+
+/* ============================================================
    住民向け（未ログイン）
    ============================================================ */
 
