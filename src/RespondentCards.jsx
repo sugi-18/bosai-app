@@ -94,14 +94,14 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdi
         <div style={{ width: "100%", height: 300 }}>
           <ResponsiveContainer>
             <RadarChart data={data} outerRadius="72%">
-              <PolarGrid stroke="#d3dbd5" />
-              <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5b6b62" }} />
-              <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa8a0" }} />
+              <PolarGrid stroke="#d4d9e2" />
+              <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5a6478" }} />
+              <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa3b4" }} />
               <Tooltip formatter={(v, n) => [`${r2(v)} 点`, n]}
                 labelFormatter={(l) => { const d = data.find((x) => x.no === l); return `${l}. ${d ? d.label : ""}`; }}
-                contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
+                contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d4d9e2" }} />
               <Legend wrapperStyle={{ fontSize: 13 }} />
-              <Radar name="本人" dataKey="本人" stroke="#00703c" fill="#00703c" fillOpacity={0.28} strokeWidth={2} />
+              <Radar name="本人" dataKey="本人" stroke="#1b3a6b" fill="#1b3a6b" fillOpacity={0.28} strokeWidth={2} />
               {areaAvg && <Radar name="地域平均" dataKey="地域平均" stroke="#e0a12c" fill="#e0a12c" fillOpacity={0.12} strokeWidth={2} />}
             </RadarChart>
           </ResponsiveContainer>
@@ -201,7 +201,7 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdi
           <h3>この方が優先して取り組むとよい項目</h3>
           {weak.map((w, i) => (
             <div className="dz-row" key={`${w.sec}${w.it.item_no}`}>
-              <span className="dz-tag" style={{ background: w.mine <= 1 ? "#c1272d" : w.mine <= 2 ? "#e0a12c" : "#00703c" }}>
+              <span className="dz-tag" style={{ background: w.mine <= 1 ? "#c1272d" : w.mine <= 2 ? "#e0a12c" : "#1b3a6b" }}>
                 {i + 1}
               </span>
               <span>
@@ -372,7 +372,7 @@ const RC_CSS = `
 .rc-bar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;}
 .rc-num{margin:0 0 10px auto;font-size:13px;color:var(--sub);font-variant-numeric:tabular-nums;}
 .rc-tr{cursor:pointer;}
-.rc-tr:hover{background:var(--green-l);}
+.rc-tr:hover{background:var(--navy-l);}
 .dz-table td.sub{color:var(--sub);font-size:13px;}
 .rc-card{margin-top:8px;}
 .rc-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;

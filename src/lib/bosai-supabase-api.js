@@ -381,11 +381,30 @@ export function toCsv(rows, header) {
  *   親をたどって印を付けるのは、途中の親まで消してしまうと
  *   中身ごと消えてしまうためです。
  */
-export function printElement(selector) {
-  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
-  if (!el) { window.print(); return; }
+let printScope = null;
 
-  /* 対象の親をたどって印を付ける（body まで） */
+/**
+ * 「ここだけを印刷する」状態にする。
+ *
+ * ★ 印刷ボタンが効かないときに全体が刷られてしまう件について
+ *   ブラウザには「利用者が押していない印刷は実行しない」という決まりがあり、
+ *   Firefox では「このWebサイトから自動的に印刷することは禁止されています」と
+ *   出て、画面の印刷ボタンが効かないことがあります。
+ *   そのあと利用者が Ctrl+P で印刷すると、以前の作りでは
+ *   目印がもう外れていたため、管理画面まるごとが刷られていました。
+ *
+ *   そこで、印刷プレビューを開いているあいだはずっと目印を付けたままにします。
+ *   こうしておけば、画面のボタンから刷っても、Ctrl+P やブラウザのメニューから
+ *   刷っても、対象の資料だけが出ます。
+ *   目印は印刷用の指定（@media print）にしか効かないので、
+ *   画面の見え方は変わりません。
+ */
+export function beginPrintScope(selector) {
+  endPrintScope();
+
+  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) return;
+
   const marked = [];
   let node = el.parentElement;
   while (node && node !== document.documentElement) {
@@ -396,20 +415,33 @@ export function printElement(selector) {
 
   el.classList.add("print-target");
   document.body.classList.add("printing-one");
+  printScope = { el, marked };
+}
 
-  let done = false;
-  const clear = () => {
-    if (done) return;
-    done = true;
-    el.classList.remove("print-target");
-    marked.forEach((n) => n.classList.remove("print-keep"));
-    document.body.classList.remove("printing-one");
-  };
+/** 「ここだけを印刷する」状態を解除する */
+export function endPrintScope() {
+  if (!printScope) return;
+  printScope.el.classList.remove("print-target");
+  printScope.marked.forEach((n) => n.classList.remove("print-keep"));
+  document.body.classList.remove("printing-one");
+  printScope = null;
+}
 
-  window.addEventListener("afterprint", clear, { once: true });
-  /* afterprint が来ない環境向けの保険 */
-  window.addEventListener("focus", clear, { once: true });
-  setTimeout(clear, 60000);
+/**
+ * 指定した部分だけをその場で印刷する。
+ * 個票のように、プレビュー画面を挟まずに刷るところで使います。
+ */
+export function printElement(selector) {
+  const el = typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) { window.print(); return; }
+
+  beginPrintScope(el);
+
+  /* 印刷が終わったら戻す。
+     afterprint が来ない環境もあるので、時間でも戻るようにしておく。
+     （目印が残っていても画面の見え方は変わらないため、急いで消す必要はない） */
+  window.addEventListener("afterprint", endPrintScope, { once: true });
+  setTimeout(endPrintScope, 120000);
 
   window.print();
 }

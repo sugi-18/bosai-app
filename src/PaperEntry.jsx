@@ -247,7 +247,7 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
           <label htmlFor="pe-mt">立場</label>
           <select id="pe-mt" value={meta.member_type ?? "住民"}
             onChange={(e) => setMeta({ ...meta, member_type: e.target.value })}>
-            <option>住民</option><option>役員・区長</option>
+            <option>住民</option><option>役員・区長</option><option>その他</option>
           </select>
         </div>
         <div className="dz-field">
@@ -405,18 +405,18 @@ const PE_CSS = `
 .pe-count .k{display:block;font-size:11px;letter-spacing:.14em;color:var(--sub);}
 .pe-count .v{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.2;}
 .pe-count .v i{font-size:14px;font-style:normal;color:var(--sub);font-weight:700;}
-.pe-help{background:var(--green-l);border-radius:6px;padding:10px 14px;font-size:13px;margin:14px 0 0;}
+.pe-help{background:var(--navy-l);border-radius:6px;padding:10px 14px;font-size:13px;margin:14px 0 0;}
 .pe-help kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;
  background:#fff;padding:1px 7px;font-family:inherit;font-size:12px;font-weight:800;margin:0 1px;}
 .pe-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px;}
-.pe-sec{font-size:15px;font-weight:900;margin:22px 0 6px;padding-top:14px;border-top:2px solid var(--green);}
-.pe-sub{font-size:13px;font-weight:800;color:var(--green-d);margin:16px 0 4px;}
+.pe-sec{font-size:15px;font-weight:900;margin:22px 0 6px;padding-top:14px;border-top:2px solid var(--navy);}
+.pe-sub{font-size:13px;font-weight:800;color:var(--navy-d);margin:16px 0 4px;}
 .pe-rows{margin-top:6px;}
 .pe-row{display:flex;gap:10px;align-items:center;padding:5px 8px;border-radius:5px;
  border-left:4px solid transparent;cursor:pointer;}
-.pe-row:hover{background:#f6f8f6;}
+.pe-row:hover{background:#f5f7fb;}
 .pe-row.on{background:var(--amber-l);border-left-color:var(--amber);}
-.pe-row.done .pe-no{background:var(--green);color:#fff;}
+.pe-row.done .pe-no{background:var(--navy);color:#fff;}
 .pe-no{flex:none;width:26px;height:24px;display:grid;place-items:center;background:var(--paper);
  color:var(--sub);border-radius:4px;font-size:12px;font-weight:900;font-variant-numeric:tabular-nums;}
 .pe-label{flex:1 1 auto;font-size:13.5px;line-height:1.4;min-width:180px;}
@@ -425,8 +425,8 @@ const PE_CSS = `
 .pe-opt{border:1.5px solid var(--line);background:#fff;border-radius:5px;padding:4px 9px;
  font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink);white-space:nowrap;}
 .pe-opt b{display:inline-block;min-width:13px;color:var(--sub);font-size:11px;margin-right:4px;}
-.pe-opt:hover{border-color:var(--green);}
-.pe-opt.sel{background:var(--green);border-color:var(--green);color:#fff;font-weight:800;}
+.pe-opt:hover{border-color:var(--navy);}
+.pe-opt.sel{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:800;}
 .pe-opt.sel b{color:rgba(255,255,255,.7);}
 .pe-save{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:22px;
  position:sticky;bottom:0;background:#fff;padding:14px 0;border-top:1px solid var(--line);}

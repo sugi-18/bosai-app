@@ -1301,6 +1301,10 @@ export default function BosaiSurvey() {
                   役員・区長
                 </option>
 
+                <option>
+                  その他
+                </option>
+
               </select>
 
             </div>
@@ -2448,7 +2452,7 @@ function Done({
                           ? "#c1272d"
                           : w.score <= 2
                             ? "#e0a12c"
-                            : "#00703c",
+                            : "#1b3a6b",
                     }}
                   >
                     {i + 1}
@@ -2604,7 +2608,7 @@ function ResultRadar({
           >
 
             <PolarGrid
-              stroke="#d3dbd5"
+              stroke="#d4d9e2"
             />
 
 
@@ -2612,7 +2616,7 @@ function ResultRadar({
               dataKey="no"
               tick={{
                 fontSize: 11,
-                fill: "#5b6b62",
+                fill: "#5a6478",
               }}
             />
 
@@ -2623,7 +2627,7 @@ function ResultRadar({
               angle={90}
               tick={{
                 fontSize: 10,
-                fill: "#9aa8a0",
+                fill: "#9aa3b4",
               }}
             />
 
@@ -2652,7 +2656,7 @@ function ResultRadar({
                 fontSize: 13,
                 borderRadius: 6,
                 border:
-                  "1px solid #d3dbd5",
+                  "1px solid #d4d9e2",
               }}
             />
 
@@ -2667,8 +2671,8 @@ function ResultRadar({
             <Radar
               name="あなた"
               dataKey="あなた"
-              stroke="#00703c"
-              fill="#00703c"
+              stroke="#1b3a6b"
+              fill="#1b3a6b"
               fillOpacity={0.28}
               strokeWidth={2}
             />
@@ -2694,14 +2698,14 @@ function ResultRadar({
 const CSS = `
 
 .bs{
- --ink:#16211c;
- --sub:#5b6b62;
- --line:#d3dbd5;
- --paper:#eef2ee;
+ --ink:#141a28;
+ --sub:#5a6478;
+ --line:#d4d9e2;
+ --paper:#eef1f7;
  --card:#fff;
- --green:#00703c;
- --green-d:#004f2a;
- --green-l:#e3efe8;
+ --navy:#1b3a6b;
+ --navy-d:#12274a;
+ --navy-l:#e4eaf4;
  --red:#c1272d;
  --amber:#e0a12c;
  --amber-l:#fbf1dd;
@@ -2735,7 +2739,7 @@ const CSS = `
 }
 
 .bs-head{
- background:var(--green-d);
+ background:var(--navy-d);
  color:#fff;
  border-bottom:6px solid var(--amber);
 }
@@ -2797,7 +2801,7 @@ const CSS = `
  display:flex;
  gap:12px;
  align-items:baseline;
- background:var(--green);
+ background:var(--navy);
  color:#fff;
  padding:10px 14px;
  border-radius:4px;
@@ -2837,8 +2841,8 @@ const CSS = `
  height:30px;
  display:grid;
  place-items:center;
- background:var(--green-l);
- color:var(--green-d);
+ background:var(--navy-l);
+ color:var(--navy-d);
  border-radius:4px;
  font-weight:900;
  font-size:14px;
@@ -2895,12 +2899,12 @@ const CSS = `
 }
 
 .bs-opt:hover{
- border-color:var(--green);
+ border-color:var(--navy);
 }
 
 .bs-opt[aria-pressed="true"]{
- border-color:var(--green);
- background:var(--green-l);
+ border-color:var(--navy);
+ background:var(--navy-l);
  font-weight:800;
 }
 
@@ -2913,14 +2917,14 @@ const CSS = `
 }
 
 .bs-opt[aria-pressed="true"] .bs-dot{
- border-color:var(--green);
- background:var(--green);
+ border-color:var(--navy);
+ background:var(--navy);
  box-shadow:
  inset 0 0 0 3px #fff;
 }
 
 .bs-quiz{
- border:2px solid var(--green-l);
+ border:2px solid var(--navy-l);
  border-radius:6px;
  padding:4px 14px;
  margin-top:6px;
@@ -2965,8 +2969,8 @@ const CSS = `
 }
 
 .bs-ox button[aria-pressed="true"]{
- border-color:var(--green);
- background:var(--green);
+ border-color:var(--navy);
+ background:var(--navy);
  color:#fff;
 }
 
@@ -3021,7 +3025,7 @@ const CSS = `
 
 .bs-prog-fill{
  height:100%;
- background:var(--green);
+ background:var(--navy);
  transition:width .3s ease;
 }
 
@@ -3043,23 +3047,23 @@ const CSS = `
  font-weight:800;
  padding:16px 28px;
  cursor:pointer;
- background:var(--green);
+ background:var(--navy);
  color:#fff;
 }
 
 .bs-btn:hover{
- background:var(--green-d);
+ background:var(--navy-d);
 }
 
 .bs-btn:disabled{
- background:#b6c2ba;
+ background:#b7c0d1;
  cursor:not-allowed;
 }
 
 .bs-btn.ghost{
  background:#fff;
- color:var(--green-d);
- border:2px solid var(--green);
+ color:var(--navy-d);
+ border:2px solid var(--navy);
 }
 
 .bs-actions{
@@ -3117,7 +3121,7 @@ const CSS = `
 }
 
 .bs-score.total{
- background:var(--green-d);
+ background:var(--navy-d);
  color:#fff;
 }
 
@@ -3137,7 +3141,7 @@ const CSS = `
 .bs-meter i{
  display:block;
  height:100%;
- background:var(--green);
+ background:var(--navy);
 }
 
 .bs-score.total .bs-meter{
@@ -3307,7 +3311,7 @@ const CSS = `
 .bs-fs button[aria-pressed="true"],
 .bs-mode[aria-pressed="true"]{
  background:#fff;
- color:var(--green-d);
+ color:var(--navy-d);
  border-color:#fff;
 }
 

@@ -25,7 +25,7 @@ const MIN_ITEM_N = 3;
 const NA = "未記入";
 
 const AXES = [
-  { key: "member_type",     label: "立場",     order: ["住民", "役員・区長"] },
+  { key: "member_type",     label: "立場",     order: ["住民", "役員・区長", "その他"] },
   { key: "age_band",        label: "年代",     order: ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"] },
   { key: "household_size",  label: "世帯人数", order: ["単身", "2人", "3人", "4人", "5人", "6人", "7人以上"] },
   { key: "residence_years", label: "居住年数", order: ["1年未満", "1〜4年", "5〜9年", "10〜19年", "20年以上"] },
@@ -271,7 +271,7 @@ export default function CrossTab({ roundId, roundLabel, master }) {
                       </span>
                       <span className="ct-track">
                         <span style={{ width: `${Math.max(p, 0)}%`,
-                          background: s.avg >= overall ? "#00703c" : "#9aa8a0" }} />
+                          background: s.avg >= overall ? "#1b3a6b" : "#9aa3b4" }} />
                         <span className="ct-mark" style={{ left: `${(overall / metric.max) * 100}%` }} />
                       </span>
                       <span className="ct-val">{s.avg.toFixed(1)}</span>
@@ -353,14 +353,14 @@ const CT_CSS = `
  border-radius:6px;background:#fff;color:var(--ink);min-width:150px;}
 .ct-check{display:flex;align-items:center;gap:7px;font-size:13px;padding-bottom:10px;
  cursor:pointer;}
-.ct-check input{width:17px;height:17px;accent-color:var(--green);}
+.ct-check input{width:17px;height:17px;accent-color:var(--navy);}
 .ct-bars{margin-top:20px;}
 .ct-row{display:grid;grid-template-columns:118px 1fr 52px 52px;gap:12px;align-items:center;
  padding:7px 0;}
 .ct-row.small{opacity:.62;}
 .ct-name{font-size:14px;font-weight:800;line-height:1.3;}
 .ct-name i{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--sub);}
-.ct-track{position:relative;display:block;height:20px;background:#e2e8e4;border-radius:4px;}
+.ct-track{position:relative;display:block;height:20px;background:#e2e6ef;border-radius:4px;}
 .ct-track > span:first-child{display:block;height:100%;border-radius:4px;}
 .ct-mark{position:absolute;top:-3px;bottom:-3px;width:0;border-left:2px dashed #e0a12c;}
 .ct-val{font-size:15px;font-weight:900;text-align:right;font-variant-numeric:tabular-nums;}
@@ -386,7 +386,7 @@ const CT_CSS = `
  margin-right:7px;}
 .ct-lo b{font-size:15px;font-weight:900;color:var(--red);margin-left:7px;
  font-variant-numeric:tabular-nums;}
-.ct-hi b{font-size:15px;font-weight:900;color:var(--green);margin-left:7px;
+.ct-hi b{font-size:15px;font-weight:900;color:var(--navy);margin-left:7px;
  font-variant-numeric:tabular-nums;}
 .ct-lo em,.ct-hi em{font-style:normal;font-size:11px;color:var(--sub);margin-left:5px;}
 .ct-arrow{color:var(--sub);}

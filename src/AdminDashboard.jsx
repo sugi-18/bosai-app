@@ -28,6 +28,7 @@ import CrossTab from "./CrossTab";
 import ActionPlan from "./ActionPlan";
 import ReportSheet from "./ReportSheet";
 import SurveyForm from "./SurveyForm";
+import AssocCompare from "./AssocCompare";
 import QrPanel from "./QrCode";
 
 /* ============================================================
@@ -158,15 +159,15 @@ function CompareRadar({ title, items, a, b, aName, bName }) {
       <div style={{ width: "100%", height: 330 }}>
         <ResponsiveContainer>
           <RadarChart data={data} outerRadius="72%">
-            <PolarGrid stroke="#d3dbd5" />
-            <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5b6b62" }} />
-            <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa8a0" }} />
+            <PolarGrid stroke="#d4d9e2" />
+            <PolarAngleAxis dataKey="no" tick={{ fontSize: 11, fill: "#5a6478" }} />
+            <PolarRadiusAxis domain={[0, 5]} tickCount={6} angle={90} tick={{ fontSize: 10, fill: "#9aa3b4" }} />
             <Tooltip formatter={(v, n) => [`${r2(v)} 点`, n]}
               labelFormatter={(l) => { const d = data.find((x) => x.no === l); return `${l}. ${d ? d.label : ""}`; }}
-              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
+              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d4d9e2" }} />
             <Legend wrapperStyle={{ fontSize: 13 }} />
-            {hasA && <Radar name={aName} dataKey={aName} stroke="#9aa8a0" fill="#9aa8a0" fillOpacity={0.16} strokeWidth={2} />}
-            <Radar name={bName} dataKey={bName} stroke="#00703c" fill="#00703c" fillOpacity={0.3} strokeWidth={2} />
+            {hasA && <Radar name={aName} dataKey={aName} stroke="#9aa3b4" fill="#9aa3b4" fillOpacity={0.16} strokeWidth={2} />}
+            <Radar name={bName} dataKey={bName} stroke="#1b3a6b" fill="#1b3a6b" fillOpacity={0.3} strokeWidth={2} />
           </RadarChart>
         </ResponsiveContainer>
       </div>
@@ -747,14 +748,14 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                       <div style={{ width: "100%", height: 260 }}>
                         <ResponsiveContainer>
                           <LineChart data={trend} margin={{ top: 16, right: 20, left: 0, bottom: 4 }}>
-                            <CartesianGrid stroke="#e6ebe7" vertical={false} />
+                            <CartesianGrid stroke="#e6eaf1" vertical={false} />
                             <XAxis dataKey="name" tick={{ fontSize: 13 }} />
                             <YAxis domain={[0, 200]} tick={{ fontSize: 12 }} />
                             <Tooltip formatter={(v, n) => [`${v} 点`, n]}
-                              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d3dbd5" }} />
+                              contentStyle={{ fontSize: 13, borderRadius: 6, border: "1px solid #d4d9e2" }} />
                             <Legend wrapperStyle={{ fontSize: 13 }} />
-                            <Line type="monotone" dataKey="総合" stroke="#004f2a" strokeWidth={3} dot={{ r: 5 }} />
-                            <Line type="monotone" dataKey="防災行動力" stroke="#00703c" strokeWidth={2} dot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="総合" stroke="#12274a" strokeWidth={3} dot={{ r: 5 }} />
+                            <Line type="monotone" dataKey="防災行動力" stroke="#4f7cb8" strokeWidth={2} dot={{ r: 4 }} />
                             <Line type="monotone" dataKey="初動対応力" stroke="#e0a12c" strokeWidth={2} dot={{ r: 4 }} />
                           </LineChart>
                         </ResponsiveContainer>
@@ -817,7 +818,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                             <h3 style={{ marginTop: 0 }}>伸びた項目</h3>
                             {deltas.up.map((x) => (
                               <div className="dz-row" key={`u${x.sec}${x.item_no}`}>
-                                <span className="dz-tag" style={{ background: "#00703c" }}>{fmtDelta(x.d)}</span>
+                                <span className="dz-tag" style={{ background: "#1b3a6b" }}>{fmtDelta(x.d)}</span>
                                 <span><b>{x.category}／{x.item_no}. {x.label}</b>
                                   <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
                               </div>
@@ -827,7 +828,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                             <h3 style={{ marginTop: 0 }}>下がった・伸びていない項目</h3>
                             {deltas.down.map((x) => (
                               <div className="dz-row" key={`d${x.sec}${x.item_no}`}>
-                                <span className="dz-tag" style={{ background: x.d < 0 ? "#c1272d" : "#9aa8a0" }}>{fmtDelta(x.d)}</span>
+                                <span className="dz-tag" style={{ background: x.d < 0 ? "#c1272d" : "#9aa3b4" }}>{fmtDelta(x.d)}</span>
                                 <span><b>{x.category}／{x.item_no}. {x.label}</b>
                                   <span className="sc">{x.prev.toFixed(2)} → {x.now.toFixed(2)} 点</span></span>
                               </div>
@@ -862,6 +863,8 @@ from associations a where a.name = '〇〇自治会';`}</pre>
                       cmpId={cmpId} focus={focus} />
 
                     <CrossTab roundId={cmpId} roundLabel={cmpRound.label} master={master} />
+
+                    <AssocCompare association={association} />
 
                     <ReportSheet association={association} cmpRound={cmpRound}
                       baseRound={baseRound} catRows={catRows} deltas={deltas} focus={focus}
@@ -902,14 +905,14 @@ from associations a where a.name = '〇〇自治会';`}</pre>
    スタイル
    ============================================================ */
 const CSS = `
-.dz{--ink:#16211c;--sub:#5b6b62;--line:#d3dbd5;--paper:#eef2ee;--green:#00703c;--green-d:#004f2a;
- --green-l:#e3efe8;--red:#c1272d;--amber:#e0a12c;--amber-l:#fbf1dd;
+.dz{--ink:#141a28;--sub:#5a6478;--line:#d4d9e2;--paper:#eef1f7;--navy:#1b3a6b;--navy-d:#12274a;
+ --navy-l:#e4eaf4;--red:#c1272d;--amber:#e0a12c;--amber-l:#fbf1dd;--pos:#0f7a5a;
  color:var(--ink);background:var(--paper);font-size:16px;line-height:1.7;min-height:100vh;
  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,"Noto Sans JP",Meiryo,sans-serif;}
 .dz *{box-sizing:border-box;}
 .dz-wrap{max-width:1080px;margin:0 auto;padding:0 16px 72px;}
 .dz-login{display:grid;place-items:center;min-height:100vh;padding:20px;}
-.dz-head{background:var(--green-d);color:#fff;border-bottom:6px solid var(--amber);}
+.dz-head{background:var(--navy-d);color:#fff;border-bottom:6px solid var(--amber);}
 .dz-head-in{max-width:1080px;margin:0 auto;padding:18px 16px;}
 .dz-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
 .dz-eyebrow{font-size:11px;letter-spacing:.3em;opacity:.72;margin:0 0 4px;}
@@ -925,7 +928,7 @@ const CSS = `
 .dz-sub{color:var(--sub);font-size:12px;}
 .dz-err{color:var(--red);font-weight:700;font-size:15px;margin:12px 0 0;}
 .dz-err.card{background:#fff;border:1px solid var(--red);border-radius:6px;padding:14px 18px;}
-.dz-band{display:flex;gap:12px;align-items:baseline;background:var(--green);color:#fff;
+.dz-band{display:flex;gap:12px;align-items:baseline;background:var(--navy);color:#fff;
  padding:9px 14px;border-radius:4px;margin-top:24px;}
 .dz-band b{font-size:17px;font-weight:900;letter-spacing:.04em;}
 .dz-band span{font-size:12px;opacity:.85;}
@@ -936,16 +939,16 @@ const CSS = `
 .dz-kpi .v{font-size:34px;font-weight:900;line-height:1.15;font-variant-numeric:tabular-nums;}
 .dz-kpi .u{font-size:14px;color:var(--sub);font-weight:700;margin-left:2px;}
 .dz-kpi .d{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;}
-.dz-kpi.hi{background:var(--green-d);color:#fff;}
+.dz-kpi.hi{background:var(--navy-d);color:#fff;}
 .dz-kpi.hi .k,.dz-kpi.hi .u{color:rgba(255,255,255,.72);}
-.up{color:var(--green);}.down{color:var(--red);}
-.dz-kpi.hi .up{color:#8ee0b0;}.dz-kpi.hi .down{color:#ffb3b3;}
+.up{color:var(--pos);}.down{color:var(--red);}
+.dz-kpi.hi .up{color:#9ccdf5;}.dz-kpi.hi .down{color:#ffb3b3;}
 .dz-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px;}
 .dz-chart{background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px 8px 6px;}
 .dz-chart h3{text-align:center;font-size:15px;margin:4px 0 0;}
 .dz-table{width:100%;border-collapse:collapse;font-size:14px;}
 .dz-table th,.dz-table td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
-.dz-table th{background:var(--green-l);font-weight:800;font-size:13px;}
+.dz-table th{background:var(--navy-l);font-weight:800;font-size:13px;}
 .dz-table td.n{text-align:right;font-variant-numeric:tabular-nums;}
 .dz-scroll{overflow-x:auto;}
 .dz-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;}
@@ -961,21 +964,21 @@ const CSS = `
 .dz-pre{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:12px;
  font-size:13px;overflow-x:auto;white-space:pre;margin-top:12px;}
 .dz-pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:800;}
-.dz-pill.open{background:var(--green);color:#fff;}
-.dz-pill.closed{background:#9aa8a0;color:#fff;}
+.dz-pill.open{background:var(--navy);color:#fff;}
+.dz-pill.closed{background:#9aa3b4;color:#fff;}
 .dz-pill.draft{background:var(--amber-l);color:#8a6a1e;}
-.dz-link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--green-d);
+.dz-link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--navy-d);
  text-decoration:underline;cursor:pointer;word-break:break-all;text-align:left;}
 .dz-field label{display:block;font-weight:700;font-size:13px;margin-bottom:5px;}
 .dz-field input,.dz-field select{width:100%;font:inherit;font-size:15px;padding:11px;
  border:2px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);}
 .dz-newround{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;}
 .dz-btn{appearance:none;border:0;border-radius:6px;font:inherit;font-size:15px;font-weight:800;
- padding:12px 22px;cursor:pointer;background:var(--green);color:#fff;}
-.dz-btn:hover{background:var(--green-d);}
-.dz-btn:disabled{background:#b6c2ba;cursor:not-allowed;}
-.dz-btn.ghost{background:#fff;color:var(--green-d);border:2px solid var(--green);}
-.dz-btn.ghost:hover{background:var(--green-l);}
+ padding:12px 22px;cursor:pointer;background:var(--navy);color:#fff;}
+.dz-btn:hover{background:var(--navy-d);}
+.dz-btn:disabled{background:#b7c0d1;cursor:not-allowed;}
+.dz-btn.ghost{background:#fff;color:var(--navy-d);border:2px solid var(--navy);}
+.dz-btn.ghost:hover{background:var(--navy-l);}
 .dz-btn.ghost.light{background:transparent;color:#fff;border-color:rgba(255,255,255,.6);}
 .dz-btn.ghost.light:hover{background:rgba(255,255,255,.15);}
 .dz-btn.xs{font-size:13px;padding:7px 12px;}
@@ -1022,7 +1025,7 @@ const CSS = `
   body:not(.printing-one) .dz-chart,
   body:not(.printing-one) .dz-kpis,
   body:not(.printing-one) .dz-band{break-inside:avoid;page-break-inside:avoid;
-   box-shadow:none!important;border:1px solid #d3dbd5!important;}
+   box-shadow:none!important;border:1px solid #d4d9e2!important;}
 
   /* ---- 個票や総会資料など、一部分だけを印刷するとき ----
 

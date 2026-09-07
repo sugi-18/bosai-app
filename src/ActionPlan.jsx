@@ -17,8 +17,8 @@ import { supabase } from "./lib/bosai-supabase-api";
 const STATUSES = [
   { key: "planned", label: "予定",   color: "#e0a12c" },
   { key: "doing",   label: "実施中", color: "#0b6fa4" },
-  { key: "done",    label: "実施済", color: "#00703c" },
-  { key: "dropped", label: "見送り", color: "#9aa8a0" },
+  { key: "done",    label: "実施済", color: "#0f7a5a" },
+  { key: "dropped", label: "見送り", color: "#9aa3b4" },
 ];
 const statusOf = (k) => STATUSES.find((s) => s.key === k) ?? STATUSES[0];
 
@@ -482,7 +482,7 @@ const AP_CSS = `
 .ap-guard p:last-child{margin-bottom:0;}
 .ap-guard code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 6px;
  font-size:13px;}
-.ap-msg{background:var(--green-l);border-left:5px solid var(--green);padding:9px 14px;
+.ap-msg{background:var(--navy-l);border-left:5px solid var(--navy);padding:9px 14px;
  border-radius:0 6px 6px 0;font-size:14px;margin-top:14px;}
 .ap-focus{margin-top:20px;padding:14px 16px;background:var(--paper);border-radius:6px;}
 .ap-focus h3{margin:0 0 4px;font-size:15px;font-weight:800;}
@@ -490,7 +490,7 @@ const AP_CSS = `
 .ap-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px;}
 .ap-chip{display:flex;align-items:baseline;gap:8px;background:#fff;border:2px solid var(--line);
  border-radius:99px;padding:6px 14px;font:inherit;cursor:pointer;text-align:left;}
-.ap-chip:hover{border-color:var(--green);background:var(--green-l);}
+.ap-chip:hover{border-color:var(--navy);background:var(--navy-l);}
 .ap-chip:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
 .ap-chip b{font-size:13px;font-weight:800;}
 .ap-chip i{font-style:normal;font-size:11px;color:var(--red);font-variant-numeric:tabular-nums;}
@@ -499,10 +499,10 @@ const AP_CSS = `
  font-weight:700;padding:9px 14px;cursor:pointer;color:var(--sub);
  border-bottom:3px solid transparent;margin-bottom:-2px;}
 .ap-tab:hover{color:var(--ink);}
-.ap-tab.on{color:var(--green-d);border-bottom-color:var(--green);}
+.ap-tab.on{color:var(--navy-d);border-bottom-color:var(--navy);}
 .ap-tab i{display:inline-block;font-style:normal;margin-left:7px;background:var(--paper);
  border-radius:99px;padding:1px 8px;font-size:12px;font-variant-numeric:tabular-nums;}
-.ap-tab.on i{background:var(--green-l);color:var(--green-d);}
+.ap-tab.on i{background:var(--navy-l);color:var(--navy-d);}
 .ap-tab:focus-visible{outline:3px solid var(--amber);outline-offset:-3px;}
 .ap-none{font-size:14px;color:var(--sub);margin:18px 0 0;}
 .ap-list{margin-top:6px;}
@@ -523,7 +523,7 @@ const AP_CSS = `
 .ap-eff-lab{font-weight:800;letter-spacing:.1em;}
 .ap-eff-d{font-size:14px!important;font-weight:900;font-variant-numeric:tabular-nums;
  margin-left:4px;}
-.ap-eff-d.up{color:var(--green);}
+.ap-eff-d.up{color:var(--navy);}
 .ap-eff-d.down{color:var(--red);}
 .ap-pending{font-size:12px;color:var(--sub);margin:8px 0 0;}
 .ap-ops{flex:none;display:flex;flex-direction:column;gap:7px;align-items:stretch;}

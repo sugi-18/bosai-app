@@ -174,10 +174,10 @@ const FT_CSS = `
 .ft-tab{appearance:none;border:0;background:transparent;font:inherit;font-size:14px;font-weight:700;
  padding:9px 14px;cursor:pointer;color:var(--sub);border-bottom:3px solid transparent;margin-bottom:-2px;}
 .ft-tab:hover{color:var(--ink);}
-.ft-tab.on{color:var(--green-d);border-bottom-color:var(--green);}
+.ft-tab.on{color:var(--navy-d);border-bottom-color:var(--navy);}
 .ft-tab i{display:inline-block;font-style:normal;margin-left:7px;background:var(--paper);
  border-radius:99px;padding:1px 8px;font-size:12px;font-variant-numeric:tabular-nums;}
-.ft-tab.on i{background:var(--green-l);color:var(--green-d);}
+.ft-tab.on i{background:var(--navy-l);color:var(--navy-d);}
 .ft-tab:focus-visible{outline:3px solid var(--amber);outline-offset:-3px;}
 .ft-lead{font-size:13px;color:var(--sub);margin:14px 0 0;}
 .ft-guard{background:var(--amber-l);border-left:5px solid var(--amber);padding:14px 16px;

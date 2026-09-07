@@ -16,16 +16,16 @@
  * 先に答えた方には平均が出ず、少人数のうちに出た平均も
  * 実態とかけ離れた値になるためです。
  */
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const W = 900;
 const H = 1280;
-const GREEN = "#00703c";
-const GREEN_D = "#004f2a";
+const NAVY = "#1b3a6b";
+const NAVY_D = "#12274a";
 const AMBER = "#e0a12c";
-const INK = "#16211c";
-const SUB = "#5b6b62";
-const LINE = "#d3dbd5";
+const INK = "#141a28";
+const SUB = "#5a6478";
+const LINE = "#d4d9e2";
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -44,7 +44,7 @@ function drawRadar(ctx, cx, cy, R, items, mine, title) {
   ctx.textAlign = "center";
   ctx.fillText(title, cx, cy - R - 30);
 
-  ctx.strokeStyle = "#e2e8e4";
+  ctx.strokeStyle = "#e2e6ef";
   ctx.lineWidth = 1;
   [1, 2, 3, 4, 5].forEach((ring) => {
     ctx.beginPath();
@@ -77,7 +77,7 @@ function drawRadar(ctx, cx, cy, R, items, mine, title) {
     ctx.stroke();
   };
 
-  shape(mine, "rgba(0,112,60,.28)", GREEN, 3);
+  shape(mine, "rgba(27,58,107,.28)", NAVY, 3);
 
   ctx.font = "13px sans-serif";
   ctx.fillStyle = SUB;
@@ -97,7 +97,7 @@ function render(canvas, { master, result, roundLabel, assocName, weak }) {
   ctx.fillRect(0, 0, W, H);
 
   /* 見出し */
-  ctx.fillStyle = GREEN_D;
+  ctx.fillStyle = NAVY_D;
   ctx.fillRect(0, 0, W, 108);
   ctx.fillStyle = AMBER;
   ctx.fillRect(0, 108, W, 8);
@@ -129,9 +129,9 @@ function render(canvas, { master, result, roundLabel, assocName, weak }) {
     ctx.font = "18px sans-serif";
     ctx.fillText(`/${max}`, x + 24 + tw, y + 82);
 
-    ctx.fillStyle = "#e2e8e4";
+    ctx.fillStyle = "#e2e6ef";
     ctx.fillRect(x + 18, y + 94, w - 36, 10);
-    ctx.fillStyle = GREEN;
+    ctx.fillStyle = NAVY;
     ctx.fillRect(x + 18, y + 94, ((w - 36) * value) / max, 10);
   };
 
@@ -146,7 +146,7 @@ function render(canvas, { master, result, roundLabel, assocName, weak }) {
 
   ctx.textAlign = "center";
   ctx.font = "15px sans-serif";
-  ctx.fillStyle = GREEN;
+  ctx.fillStyle = NAVY;
   ctx.fillRect(330, 630, 16, 16);
   ctx.fillStyle = INK;
   ctx.textAlign = "left";
@@ -156,7 +156,7 @@ function render(canvas, { master, result, roundLabel, assocName, weak }) {
   ctx.fillText("数字は設問番号／各5点満点", 330, 668);
 
   /* まず取り組みたいこと */
-  ctx.fillStyle = GREEN;
+  ctx.fillStyle = NAVY;
   ctx.fillRect(44, 700, W - 88, 36);
   ctx.fillStyle = "#fff";
   ctx.font = "bold 19px sans-serif";
@@ -207,20 +207,81 @@ function render(canvas, { master, result, roundLabel, assocName, weak }) {
 }
 
 export default function ResultImage({ master, result, roundLabel, assocName, weak }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState("");        // 画面に出すための一時的なURL
+  const [file, setFile] = useState(null);    // 共有（写真に追加）に渡すファイル
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
   const canvasRef = useRef(null);
+  const urlRef = useRef("");
+
+  /* 画面を離れるときに一時URLを片付ける */
+  useEffect(() => () => {
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+  }, []);
+
+  const fileName = "防災力アンケート結果.png";
 
   const make = () => {
     setBusy(true);
+    setMsg("");
+
+    const finish = (blob) => {
+      if (!blob) { setBusy(false); setMsg("画像を作れませんでした。"); return; }
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      const objectUrl = URL.createObjectURL(blob);
+      urlRef.current = objectUrl;
+      setUrl(objectUrl);
+      try {
+        setFile(new File([blob], fileName, { type: "image/png" }));
+      } catch {
+        setFile(null);   // 古い端末では File を作れないことがある
+      }
+      setBusy(false);
+    };
+
     try {
       const canvas = canvasRef.current ?? document.createElement("canvas");
       canvasRef.current = canvas;
       render(canvas, { master, result, roundLabel, assocName, weak });
-      setUrl(canvas.toDataURL("image/png"));
+
+      /*
+       * toDataURL ではなく toBlob を使います。
+       * スマートフォンでは、とても長い data: の文字列は
+       * 「ダウンロード」も「写真に追加」も受け付けてもらえないことが多く、
+       * これが「携帯で画像を保存できない」原因でした。
+       * blob（ファイルの実体）にしておけば、共有や保存に渡せます。
+       */
+      if (canvas.toBlob) {
+        canvas.toBlob(finish, "image/png");
+      } else {
+        const data = canvas.toDataURL("image/png");
+        const bin = atob(data.split(",")[1]);
+        const buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) buf[i] = bin.charCodeAt(i);
+        finish(new Blob([buf], { type: "image/png" }));
+      }
     } catch {
-      setUrl("");
-    } finally { setBusy(false); }
+      setBusy(false);
+      setMsg("画像を作れませんでした。お手数ですが画面の写真を撮ってお使いください。");
+    }
+  };
+
+  /* スマートフォンの「写真に追加」を呼び出せるか */
+  const canShare = Boolean(
+    file && typeof navigator !== "undefined" &&
+    navigator.canShare && navigator.canShare({ files: [file] })
+  );
+
+  const share = async () => {
+    setMsg("");
+    try {
+      await navigator.share({ files: [file], title: "防災力アンケート結果" });
+    } catch (e) {
+      /* 利用者が途中でやめた場合は何も出さない */
+      if (e && e.name !== "AbortError") {
+        setMsg("保存できませんでした。下の画像を長押しして「写真に追加」をお試しください。");
+      }
+    }
   };
 
   return (
@@ -234,16 +295,36 @@ export default function ResultImage({ master, result, roundLabel, assocName, wea
       ) : (
         <div className="ri-out">
           <p className="ri-how">
-            下の画像を<b>長押し</b>して「写真に追加」「画像を保存」を選ぶと、
-            端末に残せます。パソコンの場合は右クリックか、下のボタンから保存できます。
+            {canShare
+              ? <>下の<b>「写真に保存する」</b>を押すと、端末の写真として残せます。
+                  うまくいかないときは、下の画像を<b>長押し</b>して
+                  「写真に追加」「画像を保存」を選んでください。</>
+              : <>下の画像を<b>長押し</b>して「写真に追加」「画像を保存」を選ぶと、
+                  端末に残せます。パソコンの場合は右クリックか、
+                  下の「画像をダウンロード」からどうぞ。</>}
           </p>
+
           <img src={url} alt="あなたの回答結果" className="ri-img" />
+
           <div className="bs-actions">
-            <a className="bs-btn ghost" href={url} download="防災力アンケート結果.png">
+            {canShare && (
+              <button className="bs-btn" onClick={share}>写真に保存する</button>
+            )}
+            <a className="bs-btn ghost" href={url} download={fileName}>
               画像をダウンロード
+            </a>
+            <a className="bs-btn ghost" href={url} target="_blank" rel="noreferrer">
+              画像だけを開く
             </a>
             <button className="bs-btn ghost" onClick={() => setUrl("")}>閉じる</button>
           </div>
+
+          {msg && <p className="ri-msg">{msg}</p>}
+
+          <p className="ri-note">
+            うまく保存できないときは、この画面をそのまま
+            スクリーンショット（画面の写真）で残していただいても構いません。
+          </p>
         </div>
       )}
     </div>
@@ -257,5 +338,7 @@ const RI_CSS = `
  border-left:5px solid var(--amber);padding:11px 14px;border-radius:0 6px 6px 0;margin:0 0 12px;}
 .ri-img{display:block;width:100%;max-width:520px;height:auto;border:2px solid var(--line);
  border-radius:6px;}
+.ri-msg{font-size:15px;font-weight:700;color:var(--red);margin:12px 0 0;}
+.ri-note{font-size:14px;color:var(--sub);margin:12px 0 0;}
 @media print{.ri{display:none;}}
 `;

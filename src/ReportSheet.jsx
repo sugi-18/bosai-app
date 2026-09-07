@@ -11,20 +11,20 @@
  * 印刷時に潰れたり切れたりしやすいためです。
  */
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase, printElement } from "./lib/bosai-supabase-api";
+import { supabase, beginPrintScope, endPrintScope } from "./lib/bosai-supabase-api";
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const fmtDelta = (d) => (d > 0 ? `+${Number(d).toFixed(2)}` : Number(d).toFixed(2));
 const fmtDelta1 = (d) => (d > 0 ? `+${Number(d).toFixed(1)}` : Number(d).toFixed(1));
 
 const stateOf = (v) => (v < 1.5 ? "重点課題" : v < 2.5 ? "要強化" : v < 3.5 ? "標準" : "良好");
-const colorOf = (v) => (v < 1.5 ? "#c1272d" : v < 2.5 ? "#e0a12c" : v < 3.5 ? "#8a968e" : "#00703c");
+const colorOf = (v) => (v < 1.5 ? "#c1272d" : v < 2.5 ? "#e0a12c" : v < 3.5 ? "#8a93a5" : "#1b3a6b");
 
 const ST = {
   planned: { label: "予定", color: "#e0a12c" },
   doing: { label: "実施中", color: "#0b6fa4" },
-  done: { label: "実施済", color: "#00703c" },
-  dropped: { label: "見送り", color: "#9aa8a0" },
+  done: { label: "実施済", color: "#0f7a5a" },
+  dropped: { label: "見送り", color: "#9aa3b4" },
 };
 const ST_ORDER = ["doing", "planned", "done", "dropped"];
 
@@ -80,31 +80,31 @@ function Radar({ title, items, values, compare, nameA, nameB, size = 240 }) {
         {[1, 2, 3, 4, 5].map((ring) => (
           <polygon key={ring}
             points={items.map((_, i) => point(i, ring).join(",")).join(" ")}
-            fill="none" stroke="#dfe6e1" strokeWidth="0.6" />
+            fill="none" stroke="#dfe4ee" strokeWidth="0.6" />
         ))}
         {items.map((_, i) => {
           const [x, y] = axisEnd(i);
-          return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#dfe6e1" strokeWidth="0.6" />;
+          return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#dfe4ee" strokeWidth="0.6" />;
         })}
 
         {hasCompare && (
-          <polygon points={poly(compare)} fill="#9aa8a0" fillOpacity="0.22"
-            stroke="#8a968e" strokeWidth="1.2" />
+          <polygon points={poly(compare)} fill="#9aa3b4" fillOpacity="0.22"
+            stroke="#8a93a5" strokeWidth="1.2" />
         )}
-        <polygon points={poly(values)} fill="#00703c" fillOpacity="0.24"
-          stroke="#00703c" strokeWidth="1.6" />
+        <polygon points={poly(values)} fill="#1b3a6b" fillOpacity="0.24"
+          stroke="#1b3a6b" strokeWidth="1.6" />
 
         {items.map((it, i) => {
           const [x, y] = labelPos(i);
           return (
-            <text key={i} x={x} y={y} fontSize="6.5" fill="#5b6b62"
+            <text key={i} x={x} y={y} fontSize="6.5" fill="#5a6478"
               textAnchor="middle">{it.item_no}</text>
           );
         })}
       </svg>
       <p className="rs-legend-row">
         {hasCompare && <span><i className="sw gray" />{nameA}</span>}
-        <span><i className="sw green" />{nameB}</span>
+        <span><i className="sw main" />{nameB}</span>
         <span className="rs-dim">数字は設問番号／5点満点</span>
       </p>
     </div>
@@ -126,8 +126,8 @@ function Trend({ data, width = 540, height = 165 }) {
   const y = (v) => padT + h - (h * Math.max(0, Math.min(200, v))) / 200;
 
   const series = [
-    { key: "総合", color: "#004f2a", w: 2.2 },
-    { key: "防災行動力", color: "#00703c", w: 1.4 },
+    { key: "総合", color: "#12274a", w: 2.2 },
+    { key: "防災行動力", color: "#4f7cb8", w: 1.4 },
     { key: "初動対応力", color: "#e0a12c", w: 1.4 },
   ];
 
@@ -138,13 +138,13 @@ function Trend({ data, width = 540, height = 165 }) {
         {[0, 50, 100, 150, 200].map((v) => (
           <g key={v}>
             <line x1={padL} y1={y(v)} x2={width - padR} y2={y(v)}
-              stroke="#e6ebe7" strokeWidth="0.7" />
-            <text x={padL - 4} y={y(v) + 3} fontSize="7" fill="#8a968e"
+              stroke="#e6eaf1" strokeWidth="0.7" />
+            <text x={padL - 4} y={y(v) + 3} fontSize="7" fill="#8a93a5"
               textAnchor="end">{v}</text>
           </g>
         ))}
         {data.map((d, i) => (
-          <text key={i} x={x(i)} y={height - 6} fontSize="7.5" fill="#5b6b62"
+          <text key={i} x={x(i)} y={height - 6} fontSize="7.5" fill="#5a6478"
             textAnchor="middle">{d.name}</text>
         ))}
         {series.map((s) => (
@@ -233,7 +233,7 @@ function Sheet({
   );
 
   return (
-    <div id="bosai-sheet">
+    <div id="bosai-sheet" className="print-target">
 
       {/* ============ 1枚目 ============ */}
       <div className="rs-sheet">
@@ -420,6 +420,17 @@ export default function ReportSheet({
     };
   }, [open]);
 
+  /*
+   * この資料を開いているあいだは「ここだけを印刷する」状態にしておきます。
+   * ブラウザが画面の印刷ボタンを止めてしまい、利用者が Ctrl+P で
+   * 印刷し直した場合でも、管理画面まるごとではなくこの資料だけが出ます。
+   */
+  useEffect(() => {
+    if (!open || loading) return undefined;
+    beginPrintScope("#bosai-sheet");
+    return () => endPrintScope();
+  }, [open, loading, actions]);
+
   const topFocus = useMemo(() => (focus ?? []).slice(0, 6), [focus]);
   const topUp = useMemo(
     () => (deltas?.up ?? []).filter((x) => x.d > 0).slice(0, 6),
@@ -447,7 +458,7 @@ export default function ReportSheet({
           <div className="rs-bar-top">
             <span className="rs-bar-title">印刷プレビュー（A4縦）</span>
             <div className="rs-bar-ops">
-              <button className="dz-btn" onClick={() => printElement("#bosai-sheet")}>印刷／PDFに保存</button>
+              <button className="dz-btn" onClick={() => window.print()}>印刷／PDFに保存</button>
               <button className="dz-btn xs ghost light" onClick={() => setOpen(false)}>閉じる</button>
             </div>
           </div>
@@ -462,6 +473,10 @@ export default function ReportSheet({
               )}
           </div>
           <p className="rs-tip">
+            ボタンを押しても印刷画面が出ないときは、<b>この画面を開いたまま</b>
+            キーボードの <b>Ctrl+P</b>（Macは <b>⌘+P</b>）を押してください。
+            ブラウザが自動の印刷を止めることがありますが、その場合でもこの資料だけが刷られます。
+            <br />
             文字が入りきらない場合は、印刷画面の「倍率」を90%にすると収まります。
             棒グラフやレーダーの色が出ないときは「背景のグラフィック」にチェックを入れてください。
           </p>
@@ -475,9 +490,9 @@ export default function ReportSheet({
    画面表示用のスタイル
    ============================================================ */
 const RS_CSS = `
-.rs-overlay{position:fixed;inset:0;z-index:900;background:#3a453f;
+.rs-overlay{position:fixed;inset:0;z-index:900;background:#26304a;
  display:flex;flex-direction:column;align-items:center;overflow:auto;padding-bottom:28px;}
-.rs-bar-top{position:sticky;top:0;z-index:2;width:100%;background:#004f2a;color:#fff;
+.rs-bar-top{position:sticky;top:0;z-index:2;width:100%;background:#12274a;color:#fff;
  display:flex;justify-content:space-between;align-items:center;gap:16px;padding:11px 18px;
  border-bottom:4px solid #e0a12c;}
 .rs-bar-title{font-size:14px;font-weight:800;letter-spacing:.08em;}
@@ -488,93 +503,93 @@ const RS_CSS = `
  max-width:640px;}
 
 /* ---- A4のシート ---- */
-.rs-sheet{width:210mm;min-height:297mm;background:#fff;color:#16211c;
+.rs-sheet{width:210mm;min-height:297mm;background:#fff;color:#141a28;
  padding:13mm 12mm;box-sizing:border-box;box-shadow:0 6px 30px rgba(0,0,0,.35);
  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,
  "Noto Sans JP",Meiryo,sans-serif;line-height:1.45;font-size:9.5pt;
  display:flex;flex-direction:column;margin-bottom:20px;}
 .rs-sheet:last-child{margin-bottom:0;}
 .rs-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
- border-bottom:3px solid #004f2a;padding-bottom:7px;}
+ border-bottom:3px solid #12274a;padding-bottom:7px;}
 .rs-head.slim{border-bottom-width:2px;}
-.rs-eyebrow{font-size:7pt;letter-spacing:.3em;color:#5b6b62;margin:0 0 2px;}
+.rs-eyebrow{font-size:7pt;letter-spacing:.3em;color:#5a6478;margin:0 0 2px;}
 .rs-head h1{font-size:15pt;font-weight:900;margin:0;letter-spacing:.01em;}
 .rs-head.slim h1{font-size:12.5pt;}
 .rs-headmeta{text-align:right;display:flex;flex-direction:column;gap:1px;}
 .rs-headmeta b{font-size:9.5pt;font-weight:800;}
-.rs-headmeta span{font-size:8pt;color:#5b6b62;}
+.rs-headmeta span{font-size:8pt;color:#5a6478;}
 
 .rs-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px;}
-.rs-kpi{border:1px solid #d3dbd5;border-radius:4px;padding:7px 10px;}
-.rs-kpi-k{display:block;font-size:7.5pt;letter-spacing:.14em;color:#5b6b62;}
+.rs-kpi{border:1px solid #d4d9e2;border-radius:4px;padding:7px 10px;}
+.rs-kpi-k{display:block;font-size:7.5pt;letter-spacing:.14em;color:#5a6478;}
 .rs-kpi-v{display:block;font-size:19pt;font-weight:900;line-height:1.15;
  font-variant-numeric:tabular-nums;}
-.rs-kpi-v i{font-style:normal;font-size:9pt;color:#5b6b62;font-weight:700;margin-left:2px;}
+.rs-kpi-v i{font-style:normal;font-size:9pt;color:#5a6478;font-weight:700;margin-left:2px;}
 .rs-kpi-d{display:block;font-size:8pt;font-weight:800;font-variant-numeric:tabular-nums;
- color:#5b6b62;}
-.rs-cmpnote{font-size:7.5pt;color:#5b6b62;margin:3px 0 0;}
+ color:#5a6478;}
+.rs-cmpnote{font-size:7.5pt;color:#5a6478;margin:3px 0 0;}
 
 .rs-cols{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:8px;}
 .rs-sec{break-inside:avoid;}
 .rs-sec h2{font-size:9.5pt;font-weight:900;margin:0 0 5px;padding:3px 8px;
- background:#00703c;color:#fff;border-radius:3px;display:flex;justify-content:space-between;
+ background:#1b3a6b;color:#fff;border-radius:3px;display:flex;justify-content:space-between;
  align-items:baseline;}
 .rs-sec h2 i{font-style:normal;font-size:7pt;font-weight:400;opacity:.85;}
 .rs-full{margin-top:9px;}
-.rs-none{font-size:8.5pt;color:#5b6b62;margin:0;}
+.rs-none{font-size:8.5pt;color:#5a6478;margin:0;}
 
 .rs-radars{display:grid;grid-template-columns:1fr 1fr;gap:8mm;}
 .rs-radar h3{font-size:8.5pt;font-weight:800;margin:0 0 1px;text-align:center;}
 .rs-radar svg{display:block;}
 .rs-legend-row{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;align-items:center;
- font-size:7pt;color:#16211c;margin:1px 0 0;}
+ font-size:7pt;color:#141a28;margin:1px 0 0;}
 .rs-legend-row .sw{display:inline-block;width:9px;height:9px;border-radius:2px;
  margin-right:3px;vertical-align:-1px;}
-.rs-legend-row .sw.green{background:#00703c;}
-.rs-legend-row .sw.gray{background:#9aa8a0;}
-.rs-legend-row .rs-dim{color:#8a968e;}
+.rs-legend-row .sw.main{background:#1b3a6b;}
+.rs-legend-row .sw.gray{background:#9aa3b4;}
+.rs-legend-row .rs-dim{color:#8a93a5;}
 .rs-trend svg{display:block;}
 
 .rs-bar{display:grid;grid-template-columns:52px 1fr 30px 34px;gap:5px;align-items:center;
  margin-bottom:3px;}
 .rs-bar-n{font-size:8pt;font-weight:700;}
-.rs-track{display:block;height:9px;background:#e6ebe7;border-radius:2px;overflow:hidden;}
+.rs-track{display:block;height:9px;background:#e6eaf1;border-radius:2px;overflow:hidden;}
 .rs-track span{display:block;height:100%;}
 .rs-bar-v{font-size:8.5pt;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;}
-.rs-bar-d{font-size:7.5pt;font-weight:800;text-align:right;color:#5b6b62;
+.rs-bar-d{font-size:7.5pt;font-weight:800;text-align:right;color:#5a6478;
  font-variant-numeric:tabular-nums;}
 
 .rs-focus{list-style:none;margin:0;padding:0;counter-reset:f;}
 .rs-focus li{counter-increment:f;padding:2px 0 2px 16px;position:relative;
- border-bottom:1px dotted #d3dbd5;}
+ border-bottom:1px dotted #d4d9e2;}
 .rs-focus li:before{content:counter(f);position:absolute;left:0;top:2px;font-size:7.5pt;
  font-weight:900;color:#c1272d;}
 .rs-f-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
 .rs-f-top b{font-size:8.5pt;font-weight:800;line-height:1.3;}
 .rs-f-top em{font-style:normal;font-size:9.5pt;font-weight:900;
  font-variant-numeric:tabular-nums;}
-.rs-f-sub{display:block;font-size:7pt;color:#5b6b62;}
+.rs-f-sub{display:block;font-size:7pt;color:#5a6478;}
 
 .rs-table{width:100%;border-collapse:collapse;font-size:8pt;}
-.rs-table th,.rs-table td{border:1px solid #d3dbd5;padding:3px 5px;text-align:left;
+.rs-table th,.rs-table td{border:1px solid #d4d9e2;padding:3px 5px;text-align:left;
  vertical-align:top;line-height:1.35;}
-.rs-table th{background:#e3efe8;font-weight:800;font-size:7.5pt;}
+.rs-table th{background:#e4eaf4;font-weight:800;font-size:7.5pt;}
 .rs-table td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
 .rs-st{display:inline-block;color:#fff;font-weight:800;font-size:7pt;border-radius:2px;
  padding:1px 5px;}
-.rs-dim{color:#5b6b62;}
+.rs-dim{color:#5a6478;}
 
 .rs-ups{display:flex;flex-wrap:wrap;gap:5px;}
-.rs-up{display:flex;align-items:baseline;gap:6px;border:1px solid #d3dbd5;border-radius:3px;
+.rs-up{display:flex;align-items:baseline;gap:6px;border:1px solid #d4d9e2;border-radius:3px;
  padding:3px 8px;}
 .rs-up b{font-size:8pt;font-weight:800;}
-.rs-up i{font-style:normal;font-size:7pt;color:#5b6b62;font-variant-numeric:tabular-nums;}
-.rs-up em{font-style:normal;font-size:8pt;font-weight:900;color:#00703c;
+.rs-up i{font-style:normal;font-size:7pt;color:#5a6478;font-variant-numeric:tabular-nums;}
+.rs-up em{font-style:normal;font-size:8pt;font-weight:900;color:#1b3a6b;
  font-variant-numeric:tabular-nums;}
 
 .rs-foot{display:flex;justify-content:space-between;gap:12px;margin-top:auto;padding-top:5px;
- border-top:1px solid #d3dbd5;font-size:7pt;color:#5b6b62;}
-.rs-sheet .up{color:#00703c;}
+ border-top:1px solid #d4d9e2;font-size:7pt;color:#5a6478;}
+.rs-sheet .up{color:#0f7a5a;}
 .rs-sheet .down{color:#c1272d;}
 
 @media (max-width:820px){

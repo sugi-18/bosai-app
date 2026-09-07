@@ -21,14 +21,14 @@
  *   そのまま同じ調査回に回答できます。
  */
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase, printElement } from "./lib/bosai-supabase-api";
+import { supabase, beginPrintScope, endPrintScope } from "./lib/bosai-supabase-api";
 import { QrImage } from "./QrCode";
 
 const AGES = ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
 const SEX = ["男性", "女性", "その他"];
 const HOUSE = ["単身", "2人", "3人", "4人", "5人", "6人", "7人以上"];
 const RESIDENCE = ["1年未満", "1〜4年", "5〜9年", "10〜19年", "20年以上"];
-const MEMBER = ["住民", "役員・区長"];
+const MEMBER = ["住民", "役員・区長", "その他"];
 
 /* 注記（過去5年ルール）が付く項目。DBから読めなかったときの控えです */
 const FALLBACK_NOTE = {
@@ -97,7 +97,7 @@ function Form({ association, round, master, url, noteSet }) {
     ));
 
   return (
-    <div id="bosai-survey-form" className="sf-doc">
+    <div id="bosai-survey-form" className="sf-doc print-target">
 
       {/* ---------- 表題とQRコード ---------- */}
       <header className="sf-head">
@@ -177,7 +177,7 @@ function Form({ association, round, master, url, noteSet }) {
               <th style={{ width: "18mm" }}>分類</th>
               <th style={{ width: "7mm" }}>№</th>
               <th>項目</th>
-              <th style={{ width: "78mm" }}>回答欄</th>
+              <th style={{ width: "80mm" }}>回答欄</th>
             </tr>
           </thead>
           <tbody>{choiceRows(shodouChoice, "shodou")}</tbody>
@@ -230,7 +230,7 @@ function Form({ association, round, master, url, noteSet }) {
               <th style={{ width: "18mm" }}>分類</th>
               <th style={{ width: "7mm" }}>№</th>
               <th>項目</th>
-              <th style={{ width: "78mm" }}>回答欄</th>
+              <th style={{ width: "80mm" }}>回答欄</th>
             </tr>
           </thead>
           <tbody>{choiceRows(koudou, "koudou")}</tbody>
@@ -281,10 +281,10 @@ function Form({ association, round, master, url, noteSet }) {
 
       <footer className="sf-foot">
         <span>
-          ご協力ありがとうございました。記入後は自治会役員までご提出ください。
+          ご協力ありがとうございました。役員までご提出ください。
         </span>
         <span className="sf-entry">
-          <b>役員記入欄</b>
+          <b>担当者記入欄</b>
           <span className="sf-box" aria-hidden="true" />入力済
           　入力者 <Line w="24mm" />
           　入力日 <Line w="24mm" />
@@ -348,6 +348,17 @@ export default function SurveyForm({ association, rounds, master }) {
     };
   }, [open]);
 
+  /*
+   * 開いているあいだは「ここだけを印刷する」状態にしておきます。
+   * ブラウザが画面の印刷ボタンを止めた場合でも、
+   * 利用者が Ctrl+P で刷り直せば、この用紙だけが出ます。
+   */
+  useEffect(() => {
+    if (!open) return undefined;
+    beginPrintScope("#bosai-survey-form");
+    return () => endPrintScope();
+  }, [open, roundId, noteSet]);
+
   const round = useMemo(
     () => (rounds ?? []).find((r) => r.round_id === roundId),
     [rounds, roundId]
@@ -402,7 +413,7 @@ export default function SurveyForm({ association, rounds, master }) {
           <div className="sf-bar-top">
             <span className="sf-bar-title">アンケート用紙（A4縦・2枚）</span>
             <div className="sf-bar-ops">
-              <button className="dz-btn" onClick={() => printElement("#bosai-survey-form")}>
+              <button className="dz-btn" onClick={() => window.print()}>
                 印刷／PDFに保存
               </button>
               <button className="dz-btn xs ghost light" onClick={() => setOpen(false)}>閉じる</button>
@@ -415,6 +426,9 @@ export default function SurveyForm({ association, rounds, master }) {
           </div>
 
           <p className="sf-tip">
+            ボタンを押しても印刷画面が出ないときは、<b>この画面を開いたまま</b>
+            キーボードの <b>Ctrl+P</b>（Macは <b>⌘+P</b>）を押してください。
+            <br />
             両面印刷にすると1枚に収まります。
             文字が小さいと感じる場合は、印刷画面の「倍率」を上げるか、
             用紙サイズを B4 や A3 にすると読みやすくなります。
@@ -429,9 +443,9 @@ export default function SurveyForm({ association, rounds, master }) {
    画面表示用のスタイル
    ============================================================ */
 const SF_CSS = `
-.sf-overlay{position:fixed;inset:0;z-index:900;background:#3a453f;
+.sf-overlay{position:fixed;inset:0;z-index:900;background:#26304a;
  display:flex;flex-direction:column;align-items:center;overflow:auto;padding-bottom:28px;}
-.sf-bar-top{position:sticky;top:0;z-index:2;width:100%;background:#004f2a;color:#fff;
+.sf-bar-top{position:sticky;top:0;z-index:2;width:100%;background:#12274a;color:#fff;
  display:flex;justify-content:space-between;align-items:center;gap:16px;padding:11px 18px;
  border-bottom:4px solid #e0a12c;}
 .sf-bar-title{font-size:14px;font-weight:800;letter-spacing:.08em;}
@@ -439,36 +453,36 @@ const SF_CSS = `
 .sf-stage{padding:22px 14px 0;display:flex;flex-direction:column;align-items:center;}
 .sf-tip{color:rgba(255,255,255,.75);font-size:12px;margin:14px 18px 0;text-align:center;max-width:640px;}
 
-.sf-doc{width:210mm;background:#fff;color:#16211c;padding:11mm;box-sizing:border-box;
+.sf-doc{width:210mm;background:#fff;color:#141a28;padding:11mm;box-sizing:border-box;
  box-shadow:0 6px 30px rgba(0,0,0,.35);line-height:1.3;font-size:8.4pt;
  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",YuGothic,
  "Noto Sans JP",Meiryo,sans-serif;}
 
 .sf-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8mm;
- border-bottom:2.5px solid #004f2a;padding-bottom:4px;}
-.sf-eyebrow{font-size:7pt;letter-spacing:.2em;color:#5b6b62;margin:0 0 1px;}
+ border-bottom:2.5px solid #12274a;padding-bottom:4px;}
+.sf-eyebrow{font-size:7pt;letter-spacing:.2em;color:#5a6478;margin:0 0 1px;}
 .sf-head h1{font-size:13.5pt;font-weight:900;margin:0;letter-spacing:.02em;}
 .sf-round{font-size:8.5pt;margin:2px 0 0;}
 .sf-head-r{flex:none;width:38mm;text-align:center;display:flex;flex-direction:column;
  align-items:center;gap:1px;}
-.sf-head-r img{border:1px solid #d3dbd5;}
+.sf-head-r img{border:1px solid #d4d9e2;}
 .sf-head-r b{font-size:6.8pt;font-weight:800;line-height:1.2;white-space:nowrap;}
-.sf-url{font-size:5.6pt;color:#5b6b62;word-break:break-all;line-height:1.15;}
+.sf-url{font-size:5.6pt;color:#5a6478;word-break:break-all;line-height:1.15;}
 
-.sf-howto{font-size:7.6pt;margin:4px 0 0;padding:4px 7px;background:#e3efe8;border-radius:3px;
+.sf-howto{font-size:7.6pt;margin:4px 0 0;padding:4px 7px;background:#e4eaf4;border-radius:3px;
  line-height:1.35;}
 
 .sf-sec{margin-top:4px;}
-.sf-sec h2{font-size:9.5pt;font-weight:900;margin:0 0 2px;padding:2px 7px;background:#00703c;
+.sf-sec h2{font-size:9.5pt;font-weight:900;margin:0 0 2px;padding:2px 7px;background:#1b3a6b;
  color:#fff;border-radius:3px;display:flex;justify-content:space-between;align-items:baseline;}
 .sf-sec h2 i{font-style:normal;font-size:7pt;font-weight:400;opacity:.9;}
 
 .sf-table{width:100%;border-collapse:collapse;table-layout:fixed;}
-.sf-table th,.sf-table td{border:1px solid #7f8c85;padding:1.2px 3px;text-align:left;
+.sf-table th,.sf-table td{border:1px solid #7f889c;padding:1.2px 3px;text-align:left;
  vertical-align:middle;font-size:8pt;line-height:1.26;}
-.sf-table thead th{background:#e3efe8;font-weight:800;font-size:7.5pt;text-align:center;}
-.sf-table tbody tr:nth-child(even) td{background:#f6f8f6;}
-.sf-cat{width:18mm;text-align:center;font-weight:800;font-size:7.5pt;background:#eef2ee!important;}
+.sf-table thead th{background:#e4eaf4;font-weight:800;font-size:7.5pt;text-align:center;}
+.sf-table tbody tr:nth-child(even) td{background:#f5f7fb;}
+.sf-cat{width:18mm;text-align:center;font-weight:800;font-size:7.5pt;background:#eef1f7!important;}
 .sf-cat span{writing-mode:horizontal-tb;}
 .sf-no{width:7mm;text-align:center;font-weight:800;font-variant-numeric:tabular-nums;}
 .sf-item{word-break:break-word;}
@@ -477,24 +491,24 @@ const SF_CSS = `
 
 .sf-opt{display:inline-flex;align-items:center;gap:1px;margin:0.5px 5px 0.5px 0;font-size:7.4pt;
  white-space:nowrap;}
-.sf-opt i{font-style:normal;font-size:6.5pt;font-weight:800;color:#5b6b62;margin-right:1px;}
-.sf-box{display:inline-block;width:3.4mm;height:3.4mm;border:1px solid #16211c;border-radius:1px;
+.sf-opt i{font-style:normal;font-size:6.5pt;font-weight:800;color:#5a6478;margin-right:1px;}
+.sf-box{display:inline-block;width:3.4mm;height:3.4mm;border:1px solid #141a28;border-radius:1px;
  background:#fff;flex:none;margin-right:1px;}
 
-.sf-meta th{width:24mm;background:#eef2ee;font-weight:800;font-size:8pt;}
+.sf-meta th{width:24mm;background:#eef1f7;font-weight:800;font-size:8pt;}
 .sf-meta td{padding:2px 4px;}
-.sf-line{display:inline-block;border-bottom:1px solid #16211c;height:9px;vertical-align:bottom;
+.sf-line{display:inline-block;border-bottom:1px solid #141a28;height:9px;vertical-align:bottom;
  margin:2px 0;}
-.sf-hint{display:block;font-size:6.5pt;color:#5b6b62;line-height:1.3;}
+.sf-hint{display:block;font-size:6.5pt;color:#5a6478;line-height:1.3;}
 .sf-inline{display:inline-flex;align-items:baseline;gap:2px;font-size:8pt;}
-.sf-free th{width:30mm;background:#eef2ee;font-weight:800;font-size:8pt;line-height:1.25;}
+.sf-free th{width:30mm;background:#eef1f7;font-weight:800;font-size:8pt;line-height:1.25;}
 .sf-free td{padding:3px 5px;}
-.sf-note{font-size:7pt;color:#5b6b62;margin:2px 0 0;}
+.sf-note{font-size:7pt;color:#5a6478;margin:2px 0 0;}
 
 .sf-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;
- margin-top:6px;padding-top:4px;border-top:1px solid #7f8c85;font-size:7.5pt;color:#5b6b62;}
+ margin-top:6px;padding-top:4px;border-top:1px solid #7f889c;font-size:7.5pt;color:#5a6478;}
 .sf-entry{display:flex;align-items:baseline;gap:3px;white-space:nowrap;}
-.sf-entry b{color:#16211c;margin-right:4px;}
+.sf-entry b{color:#141a28;margin-right:4px;}
 
 @media (max-width:820px){
   .sf-stage{padding:14px 0 0;}
@@ -526,7 +540,7 @@ const SF_PRINT_CSS = `
   .sf-sec{break-inside:auto;}
   .sf-table thead{display:table-header-group;}
   .sf-table tr{break-inside:avoid;page-break-inside:avoid;}
-  .sf-table tbody tr:nth-child(even) td{background:#f6f8f6!important;
+  .sf-table tbody tr:nth-child(even) td{background:#f5f7fb!important;
    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .sf-sec h2,.sf-table thead th,.sf-cat,.sf-meta th,.sf-free th,.sf-howto{
    -webkit-print-color-adjust:exact;print-color-adjust:exact;}

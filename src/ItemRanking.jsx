@@ -19,7 +19,7 @@ const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 const stateOf = (v) =>
   v === null ? "—" : v < 1.5 ? "重点課題" : v < 2.5 ? "要強化" : v < 3.5 ? "標準" : "良好";
 const colorOf = (v) =>
-  v === null ? "#d3dbd5" : v < 1.5 ? "#c1272d" : v < 2.5 ? "#e0a12c" : v < 3.5 ? "#9aa8a0" : "#00703c";
+  v === null ? "#d4d9e2" : v < 1.5 ? "#c1272d" : v < 2.5 ? "#e0a12c" : v < 3.5 ? "#9aa3b4" : "#1b3a6b";
 
 const SORTS = [
   { key: "low", label: "平均点の低い順" },
@@ -79,7 +79,7 @@ function Detail({ row }) {
                 <span className="ir-bar-num">{c}／{st.quizN}名（{p}%）</span>
               </div>
               <div className="ir-track">
-                <span style={{ width: `${p}%`, background: p < 40 ? "#c1272d" : p < 70 ? "#e0a12c" : "#00703c" }} />
+                <span style={{ width: `${p}%`, background: p < 40 ? "#c1272d" : p < 70 ? "#e0a12c" : "#1b3a6b" }} />
               </div>
             </div>
           );
@@ -344,7 +344,7 @@ const IR_CSS = `
 .ir-head{display:grid;grid-template-columns:34px 1fr 132px 62px 74px 20px;gap:10px;
  align-items:center;width:100%;text-align:left;background:none;border:0;font:inherit;
  padding:11px 6px;cursor:pointer;color:inherit;}
-.ir-head:hover{background:var(--green-l);}
+.ir-head:hover{background:var(--navy-l);}
 .ir-head:focus-visible{outline:3px solid var(--amber);outline-offset:-3px;}
 .ir-rank{font-size:13px;font-weight:900;color:var(--sub);text-align:right;
  font-variant-numeric:tabular-nums;}
@@ -356,7 +356,7 @@ const IR_CSS = `
 .ir-delta{font-size:13px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;}
 .ir-state{font-size:12px;font-weight:800;text-align:right;}
 .ir-caret{font-size:9px;color:var(--sub);text-align:center;}
-.ir-track{display:block;height:8px;background:#e2e8e4;border-radius:99px;overflow:hidden;}
+.ir-track{display:block;height:8px;background:#e2e6ef;border-radius:99px;overflow:hidden;}
 .ir-track.sm{width:56px;flex:none;}
 .ir-track span{display:block;height:100%;border-radius:99px;}
 .ir-detail{padding:6px 12px 20px 50px;}
@@ -371,7 +371,7 @@ const IR_CSS = `
 .ir-bar-num{font-size:12px;color:var(--sub);white-space:nowrap;
  font-variant-numeric:tabular-nums;}
 .ir-tip{font-size:14px;line-height:1.65;margin:0;max-width:620px;
- background:#fff;border-left:5px solid var(--green);padding:11px 14px;border-radius:0 6px 6px 0;}
+ background:#fff;border-left:5px solid var(--navy);padding:11px 14px;border-radius:0 6px 6px 0;}
 .ir-hint{font-size:12px;color:var(--sub);margin:-4px 0 12px;}
 .ir-none{font-size:13px;color:var(--sub);margin:8px 0 0;}
 @media (max-width:760px){
