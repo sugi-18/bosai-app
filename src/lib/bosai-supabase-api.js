@@ -369,22 +369,47 @@ export function toCsv(rows, header) {
  * 画面全体の印刷と、個票や総会資料など「一部分だけ」の印刷が
  * 同じ window.print() を共有しているため、印刷したい要素に目印を付け、
  * その間だけ body に印。CSS側でその印を見て、対象以外を隠します。
+ *
+ * ★ 白紙ページが出ていた原因と対処（重要）
+ *   以前は「対象以外を visibility:hidden で見えなくする」方式でした。
+ *   visibility:hidden は見えなくなるだけで場所は残るため、
+ *   管理画面の長い中身がそのまま紙の高さとして数えられ、
+ *   資料のあとに白紙が何枚も続いていました。
+ *
+ *   そこで、印刷したい要素とその親だけに print-keep / print-target の印を付け、
+ *   それ以外は display:none で「場所ごと」消すやり方に変えています。
+ *   親をたどって印を付けるのは、途中の親まで消してしまうと
+ *   中身ごと消えてしまうためです。
  */
 export function printElement(selector) {
   const el = typeof selector === "string" ? document.querySelector(selector) : selector;
   if (!el) { window.print(); return; }
 
-  const clear = () => {
-    el.classList.remove("print-target");
-    document.body.classList.remove("printing-one");
-  };
+  /* 対象の親をたどって印を付ける（body まで） */
+  const marked = [];
+  let node = el.parentElement;
+  while (node && node !== document.documentElement) {
+    node.classList.add("print-keep");
+    marked.push(node);
+    node = node.parentElement;
+  }
 
   el.classList.add("print-target");
   document.body.classList.add("printing-one");
 
+  let done = false;
+  const clear = () => {
+    if (done) return;
+    done = true;
+    el.classList.remove("print-target");
+    marked.forEach((n) => n.classList.remove("print-keep"));
+    document.body.classList.remove("printing-one");
+  };
+
   window.addEventListener("afterprint", clear, { once: true });
   /* afterprint が来ない環境向けの保険 */
   window.addEventListener("focus", clear, { once: true });
+  setTimeout(clear, 60000);
 
   window.print();
 }

@@ -11,6 +11,10 @@
  * そこで、結果を1枚の画像として描き起こし、
  * 保存できるようにしています。画像であれば、
  * どの端末でも長押しやダウンロードで写真として残せます。
+ *
+ * 地域平均は重ねていません。一斉に回答していただく場では、
+ * 先に答えた方には平均が出ず、少人数のうちに出た平均も
+ * 実態とかけ離れた値になるためです。
  */
 import React, { useState, useRef } from "react";
 
@@ -27,7 +31,7 @@ const r2 = (x) => Math.round(x * 100) / 100;
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 
 /** レーダーを1つ描く */
-function drawRadar(ctx, cx, cy, R, items, mine, area, title) {
+function drawRadar(ctx, cx, cy, R, items, mine, title) {
   const n = items.length;
   const point = (i, v) => {
     const a = (Math.PI * 2 * i) / n - Math.PI / 2;
@@ -73,9 +77,6 @@ function drawRadar(ctx, cx, cy, R, items, mine, area, title) {
     ctx.stroke();
   };
 
-  if (Array.isArray(area) && area.some((v) => v != null)) {
-    shape(area.map((v) => v ?? 0), "rgba(154,168,160,.28)", "#8a968e", 2);
-  }
   shape(mine, "rgba(0,112,60,.28)", GREEN, 3);
 
   ctx.font = "13px sans-serif";
@@ -87,7 +88,7 @@ function drawRadar(ctx, cx, cy, R, items, mine, area, title) {
 }
 
 /** 結果を1枚の画像として描く */
-function render(canvas, { master, result, areaAvg, roundLabel, assocName, weak }) {
+function render(canvas, { master, result, roundLabel, assocName, weak }) {
   const ctx = canvas.getContext("2d");
   canvas.width = W;
   canvas.height = H;
@@ -140,8 +141,8 @@ function render(canvas, { master, result, areaAvg, roundLabel, assocName, weak }
   box(44 + (bw + 12) * 2, 148, bw, "総合得点", total, 200);
 
   /* レーダー */
-  drawRadar(ctx, 260, 470, 130, master.koudou, result.k, areaAvg?.koudou, "防災行動力");
-  drawRadar(ctx, 640, 470, 130, master.shodou, result.s, areaAvg?.shodou, "初動対応力");
+  drawRadar(ctx, 260, 470, 130, master.koudou, result.k, "防災行動力");
+  drawRadar(ctx, 640, 470, 130, master.shodou, result.s, "初動対応力");
 
   ctx.textAlign = "center";
   ctx.font = "15px sans-serif";
@@ -150,12 +151,6 @@ function render(canvas, { master, result, areaAvg, roundLabel, assocName, weak }
   ctx.fillStyle = INK;
   ctx.textAlign = "left";
   ctx.fillText("あなた", 354, 644);
-  if (areaAvg) {
-    ctx.fillStyle = "#8a968e";
-    ctx.fillRect(452, 630, 16, 16);
-    ctx.fillStyle = INK;
-    ctx.fillText("地域平均", 476, 644);
-  }
   ctx.fillStyle = SUB;
   ctx.font = "13px sans-serif";
   ctx.fillText("数字は設問番号／各5点満点", 330, 668);
@@ -211,7 +206,7 @@ function render(canvas, { master, result, areaAvg, roundLabel, assocName, weak }
   );
 }
 
-export default function ResultImage({ master, result, areaAvg, roundLabel, assocName, weak }) {
+export default function ResultImage({ master, result, roundLabel, assocName, weak }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef(null);
@@ -221,7 +216,7 @@ export default function ResultImage({ master, result, areaAvg, roundLabel, assoc
     try {
       const canvas = canvasRef.current ?? document.createElement("canvas");
       canvasRef.current = canvas;
-      render(canvas, { master, result, areaAvg, roundLabel, assocName, weak });
+      render(canvas, { master, result, roundLabel, assocName, weak });
       setUrl(canvas.toDataURL("image/png"));
     } catch {
       setUrl("");

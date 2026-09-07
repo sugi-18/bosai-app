@@ -35,7 +35,6 @@ import {
   getOpenRound,
   getItemMaster,
   submitResponse,
-  getRoundItemAverages,
   isResidentCodeTaken,
 } from "./lib/bosai-supabase-api";
 
@@ -276,8 +275,6 @@ export default function BosaiSurvey() {
   /* ---- 結果 ---- */
 
   const [result, setResult] = useState(null);
-
-  const [areaAvg, setAreaAvg] = useState(null);
 
   const [sendError, setSendError] = useState("");
 
@@ -788,23 +785,6 @@ export default function BosaiSurvey() {
         k: kScores,
         s: sScores,
       });
-
-
-      try {
-
-        setAreaAvg(
-          await getRoundItemAverages(
-            accessCode
-          )
-        );
-
-      } catch {
-
-        /*
-         * 平均は無くても結果は表示する。
-         */
-
-      }
 
 
       setPhase("done");
@@ -1967,7 +1947,6 @@ export default function BosaiSurvey() {
           <Done
             master={master}
             result={result}
-            areaAvg={areaAvg}
             round={round}
           />
 
@@ -2258,7 +2237,6 @@ function QuizBlock({
 function Done({
   master,
   result,
-  areaAvg,
   round,
 }) {
 
@@ -2411,7 +2389,6 @@ function Done({
           title="防災行動力"
           items={master.koudou}
           mine={result.k}
-          area={areaAvg?.koudou}
         />
 
 
@@ -2419,24 +2396,9 @@ function Done({
           title="初動対応力"
           items={master.shodou}
           mine={result.s}
-          area={areaAvg?.shodou}
         />
 
       </div>
-
-
-      {areaAvg &&
-        !areaAvg.available && (
-
-        <p className="bs-note">
-
-          地域平均は、
-          回答が5名分そろってから
-          表示されます。
-
-        </p>
-
-      )}
 
 
       <div className="bs-card">
@@ -2542,7 +2504,6 @@ function Done({
         <ResultImage
           master={master}
           result={result}
-          areaAvg={areaAvg}
           roundLabel={round?.round_label}
           assocName={round?.association_name}
           weak={weak}
@@ -2590,15 +2551,17 @@ function ResultRadar({
   title,
   items,
   mine,
-  area,
 }) {
 
-  const hasArea =
-    Array.isArray(area) &&
-    area.some(
-      (v) => v != null
-    );
-
+  /*
+   * 地域平均は重ねません。
+   * 一斉に回答していただく場では、
+   * 先に答えた方には平均が出ず、
+   * 少人数のうちに出た平均も
+   * 実態とかけ離れた値になるためです。
+   * 地域全体の結果は、
+   * 集計後に自治会からお知らせします。
+   */
 
   const data =
     items.map(
@@ -2612,13 +2575,6 @@ function ResultRadar({
 
         あなた:
           mine[i],
-
-        ...(hasArea
-          ? {
-              地域平均:
-                area[i] ?? 0,
-            }
-          : {}),
 
       })
     );
@@ -2717,19 +2673,6 @@ function ResultRadar({
               strokeWidth={2}
             />
 
-
-            {hasArea && (
-
-              <Radar
-                name="地域平均"
-                dataKey="地域平均"
-                stroke="#e0a12c"
-                fill="#e0a12c"
-                fillOpacity={0.12}
-                strokeWidth={2}
-              />
-
-            )}
 
           </RadarChart>
 

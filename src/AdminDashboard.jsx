@@ -27,6 +27,8 @@ import ItemRanking from "./ItemRanking";
 import CrossTab from "./CrossTab";
 import ActionPlan from "./ActionPlan";
 import ReportSheet from "./ReportSheet";
+import SurveyForm from "./SurveyForm";
+import QrPanel from "./QrCode";
 
 /* ============================================================
    定数・補助
@@ -34,6 +36,28 @@ import ReportSheet from "./ReportSheet";
 const K_CATS = ["被害拡大防止", "備蓄状況", "連絡体制", "知識習得", "地域防災活動"];
 const S_CATS = ["避難", "消火", "救出救助", "応急救護"];
 const AGES = ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
+
+/* 調査回の区分。'other'（その他）は sql/06-phase-other.sql を流すと使えます */
+const PHASES = [
+  { v: "baseline", label: "現時点評価（取組み前）" },
+  { v: "follow_up", label: "取組み後評価" },
+  { v: "other", label: "その他" },
+];
+const phaseLabel = (v) => PHASES.find((p) => p.v === v)?.label ?? "その他";
+
+/**
+ * 「その他」はデータベース側の区分に後から足したものです。
+ * sql/06-phase-other.sql をまだ流していないと保存に失敗するので、
+ * 何をすればよいかが分かる言い方で伝えます。
+ */
+function phaseHint(e) {
+  const m = String(e?.message ?? "");
+  if (/invalid input value for enum|round_phase_t/i.test(m)) {
+    return "区分「その他」は、まだデータベースに登録されていません。"
+      + "Supabase の SQL Editor で sql/06-phase-other.sql を実行してから、もう一度お試しください。";
+  }
+  return `保存できませんでした：${m}`;
+}
 
 const sum = (a) => a.reduce((x, y) => x + y, 0);
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -253,6 +277,7 @@ function RoundManager({ association, rounds, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [editId, setEditId] = useState(null);
+  const [qrId, setQrId] = useState(null);
   const [draft, setDraft] = useState({ label: "", phase: "baseline", conducted_on: "", access_code: "" });
 
   const surveyBase = `${window.location.origin}${window.location.pathname.replace(/admin\.html$/, "")}`;
@@ -265,7 +290,7 @@ function RoundManager({ association, rounds, onChanged }) {
       setMsg(`「${r.label}」を作成しました。合言葉は ${r.access_code} です。受付を開始すると回答できるようになります。`);
       setLabel("");
       onChanged();
-    } catch (e) { setMsg(`作成できませんでした：${e.message}`); }
+    } catch (e) { setMsg(phaseHint(e)); }
     finally { setBusy(false); }
   };
 
@@ -306,7 +331,7 @@ function RoundManager({ association, rounds, onChanged }) {
     } catch (e) {
       setMsg(e.message?.includes("survey_rounds_access_code_key")
         ? "その合言葉は他の調査回で使われています。別の文字にしてください。"
-        : `書き換えできませんでした：${e.message}`);
+        : phaseHint(e));
     } finally { setBusy(false); }
   };
 
@@ -335,14 +360,15 @@ function RoundManager({ association, rounds, onChanged }) {
         <table className="dz-table" style={{ marginTop: 12 }}>
           <thead>
             <tr><th>調査回</th><th style={{ width: 90 }}>状態</th><th style={{ width: 80 }}>回答数</th>
-              <th>回答URL</th><th style={{ width: 110 }}>操作</th></tr>
+              <th>回答URL</th><th style={{ width: 130 }}>操作</th></tr>
           </thead>
           <tbody>
             {rounds.map((r) => {
               const url = `${surveyBase}?code=${r.access_code ?? ""}`;
               return (
                 <tr key={r.round_id}>
-                  <td>{r.label}<br /><span className="dz-sub">{r.conducted_on}</span></td>
+                  <td>{r.label}<br />
+                    <span className="dz-sub">{phaseLabel(r.phase)}　{r.conducted_on}</span></td>
                   <td><span className={`dz-pill ${r.status}`}>
                     {r.status === "open" ? "受付中" : r.status === "closed" ? "終了" : "準備中"}
                   </span></td>
@@ -358,6 +384,10 @@ function RoundManager({ association, rounds, onChanged }) {
                       <button className="dz-btn xs ghost" disabled={busy} onClick={() => toggle(r)}>
                         {r.status === "open" ? "受付を終了" : "受付を開始"}
                       </button>
+                      <button className="dz-btn xs ghost" disabled={busy || !r.access_code}
+                        onClick={() => setQrId(qrId === r.round_id ? null : r.round_id)}>
+                        {qrId === r.round_id ? "QRを閉じる" : "QRコード"}
+                      </button>
                       <button className="dz-btn xs ghost" disabled={busy}
                         onClick={() => (editId === r.round_id ? setEditId(null) : startEdit(r))}>
                         {editId === r.round_id ? "閉じる" : "編集"}
@@ -370,6 +400,19 @@ function RoundManager({ association, rounds, onChanged }) {
           </tbody>
         </table>
       </div>
+
+      {qrId && (() => {
+        const r = rounds.find((x) => x.round_id === qrId);
+        if (!r?.access_code) return null;
+        return (
+          <QrPanel
+            url={`${surveyBase}?code=${r.access_code}`}
+            roundLabel={r.label}
+            assocName={association?.name}
+            onClose={() => setQrId(null)}
+          />
+        );
+      })()}
 
       {editId && (
         <div className="dz-editbox">
@@ -384,8 +427,7 @@ function RoundManager({ association, rounds, onChanged }) {
               <label htmlFor="er-p">区分</label>
               <select id="er-p" value={draft.phase}
                 onChange={(e) => setDraft({ ...draft, phase: e.target.value })}>
-                <option value="baseline">現時点評価（取組み前）</option>
-                <option value="follow_up">取組み後評価</option>
+                {PHASES.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
               </select>
             </div>
             <div className="dz-field" style={{ flex: "1 1 150px" }}>
@@ -428,8 +470,7 @@ function RoundManager({ association, rounds, onChanged }) {
         <div className="dz-field" style={{ flex: "1 1 180px" }}>
           <label htmlFor="rp">区分</label>
           <select id="rp" value={phase} onChange={(e) => setPhase(e.target.value)}>
-            <option value="baseline">現時点評価（取組み前）</option>
-            <option value="follow_up">取組み後評価</option>
+            {PHASES.map((p) => <option key={p.v} value={p.v}>{p.label}</option>)}
           </select>
         </div>
         <button className="dz-btn" disabled={busy || !label.trim()} onClick={add}>作成</button>
@@ -845,6 +886,7 @@ from associations a where a.name = '〇〇自治会';`}</pre>
           　<RespondentCards roundId={cmpId} roundLabel={cmpRound?.label} master={master}
             areaAvg={cmpAvg} onChanged={loadRounds} />
             <FreeTextPanel roundId={cmpId} roundLabel={cmpRound?.label} />
+            <SurveyForm association={association} rounds={rounds} master={master} />
             <PaperEntry association={association} rounds={rounds} master={master} onSaved={loadRounds} />
             <AssociationManager association={association} onChanged={loadBase} />
 
@@ -982,13 +1024,27 @@ const CSS = `
   body:not(.printing-one) .dz-band{break-inside:avoid;page-break-inside:avoid;
    box-shadow:none!important;border:1px solid #d3dbd5!important;}
 
-  /* ---- 個票や総会資料など、一部分だけを印刷するとき ---- */
+  /* ---- 個票や総会資料など、一部分だけを印刷するとき ----
+
+     以前は「対象以外を見えなくする（visibility:hidden）」やり方でしたが、
+     見えないだけで場所は残るため、管理画面の長い中身がそのまま紙の高さになり、
+     資料のあとに白紙が何枚も続いていました。
+
+     いまは、印刷したい要素とその親だけに印を付け、
+     それ以外を display:none で「場所ごと」消しています。 */
   body.printing-one{overflow:visible!important;}
-  body.printing-one *{visibility:hidden!important;}
-  body.printing-one .print-target,
-  body.printing-one .print-target *{visibility:visible!important;}
-  body.printing-one .print-target{position:absolute!important;left:0;top:0;
-   width:100%!important;margin:0!important;}
+
+  body.printing-one > *:not(.print-keep):not(.print-target),
+  body.printing-one .print-keep > *:not(.print-keep):not(.print-target){
+   display:none!important;}
+
+  /* 親は残すが、余白・背景・幅の指定は紙のじゃまになるので外す */
+  body.printing-one .print-keep{display:block!important;position:static!important;
+   margin:0!important;padding:0!important;border:0!important;background:none!important;
+   box-shadow:none!important;width:auto!important;max-width:none!important;
+   height:auto!important;min-height:0!important;overflow:visible!important;}
+
+  body.printing-one .print-target{margin:0!important;}
   body.printing-one .print-target .no-print{display:none!important;}
 
   .dz{background:#fff!important;}

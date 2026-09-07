@@ -597,11 +597,20 @@ const RS_PRINT_CSS = `
    overflow:visible!important;display:block!important;}
   .rs-bar-top,.rs-tip{display:none!important;}
   .rs-stage{padding:0!important;display:block!important;}
-  #bosai-sheet{width:210mm!important;padding:0!important;}
-  .rs-sheet{width:210mm!important;min-height:0!important;height:auto!important;
-   margin:0!important;padding:0!important;box-shadow:none!important;
-   break-after:page;page-break-after:always;}
-  .rs-sheet:last-child{break-after:auto;page-break-after:auto;}
+
+  /* 幅を 210mm と決め打ちすると、@page の余白（左右あわせて24mm）の分だけ
+     横にはみ出し、そのはみ出しを刷るための白紙が増えます。
+     紙の余白を差し引いた幅に自動で合わせます。 */
+  #bosai-sheet{width:auto!important;max-width:none!important;
+   margin:0!important;padding:0!important;}
+  .rs-sheet{width:auto!important;max-width:none!important;
+   min-height:0!important;height:auto!important;display:block!important;
+   margin:0!important;padding:0!important;box-shadow:none!important;}
+
+  /* 改ページは「2枚目の前」に入れる。
+     1枚目の後ろに入れると、2枚目が無いときに白紙が1枚増えます。 */
+  .rs-sheet + .rs-sheet{break-before:page;page-break-before:always;}
+
   .rs-cols,.rs-radars{grid-template-columns:1fr 1fr!important;}
   .rs-sec,.rs-table,.rs-bar,.rs-focus li,.rs-radar,.rs-trend{break-inside:avoid;}
   .rs-foot{margin-top:10px!important;}
