@@ -32,11 +32,24 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
   const [log, setLog] = useState([]);         // 入力済みの記録
   const rowRefs = useRef([]);
 
-  /* 受付中の調査回を初期選択 */
+  /*
+   * 調査回の初期選択と、選択の直し。
+   *
+   * ★ 登録先の取り違えを防ぐための直しについて
+   *   以前は「まだ何も選ばれていなければ選ぶ」という書き方でした。
+   *   そのため、別の自治会に切り替えたときに、
+   *   前の自治会の調査回が選ばれたまま残ってしまいます。
+   *   選択欄には先頭の調査回が表示されるのに、中身は前の自治会のまま――
+   *   気づかずに登録すると、別の自治会の調査回に
+   *   書き込んでしまうおそれがありました。
+   *
+   *   いまは「いま選ばれているものが一覧に無ければ選び直す」ようにしています。
+   */
   useEffect(() => {
-    if (roundId || !rounds.length) return;
-    const openRound = rounds.find((r) => r.status === "open") ?? rounds[rounds.length - 1];
-    if (openRound) setRoundId(openRound.round_id);
+    const list = rounds ?? [];
+    if (list.some((r) => r.round_id === roundId)) return;   // そのままでよい
+    const pick = list.find((r) => r.status === "open") ?? list[list.length - 1];
+    setRoundId(pick ? pick.round_id : "");
   }, [rounds, roundId]);
 
   /* 用紙の並びに合わせた入力欄の一覧 */

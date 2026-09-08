@@ -302,11 +302,24 @@ export default function SurveyForm({ association, rounds, master }) {
   const [roundId, setRoundId] = useState("");
   const [noteSet, setNoteSet] = useState(null);
 
-  /* 受付中の調査回を初期選択 */
+  /*
+   * 調査回の初期選択と、選択の直し。
+   *
+   * ★ 「用紙を開く」ボタンが押せなくなる不具合について
+   *   以前は「まだ何も選ばれていなければ選ぶ」という書き方でした。
+   *   そのため、別の自治会に切り替えたときに、
+   *   前の自治会の調査回が選ばれたまま残ってしまいます。
+   *   一覧に無い調査回が選ばれている状態なので、
+   *   選択欄には先頭の調査回が表示されているのに、
+   *   中身は空っぽ ―― ボタンだけが薄いまま、という見た目になっていました。
+   *
+   *   いまは「いま選ばれているものが一覧に無ければ選び直す」ようにしています。
+   */
   useEffect(() => {
-    if (roundId || !rounds?.length) return;
-    const openRound = rounds.find((r) => r.status === "open") ?? rounds[rounds.length - 1];
-    if (openRound) setRoundId(openRound.round_id);
+    const list = rounds ?? [];
+    if (list.some((r) => r.round_id === roundId)) return;   // そのままでよい
+    const pick = list.find((r) => r.status === "open") ?? list[list.length - 1];
+    setRoundId(pick ? pick.round_id : "");
   }, [rounds, roundId]);
 
   /* 注記（過去5年ルール）の付く項目を読む。読めなくても用紙は出せる */
