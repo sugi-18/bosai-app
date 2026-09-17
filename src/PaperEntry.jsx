@@ -156,6 +156,7 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
         meta: {
           resident_code: blank(meta.resident_code?.trim()),
           member_type: meta.member_type || "住民",
+          prior_round_answered: blank(meta.prior_round_answered),
           age_band: blank(meta.age_band),
           sex: blank(meta.sex),
           household_size: blank(meta.household_size),
@@ -205,6 +206,14 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
   }
 
   const round = rounds.find((r) => r.round_id === roundId);
+
+  /*
+   * 第2回以降の調査回かどうか。
+   * 同じ自治会の中に、これより前の調査回があれば第2回以降とみなします。
+   */
+  const hasPriorRound = Boolean(
+    round && rounds.some((r) => (r.sequence ?? 0) < (round.sequence ?? 0))
+  );
   let seq = -1;
 
   return (
@@ -256,6 +265,18 @@ export default function PaperEntry({ association, rounds, master, onSaved }) {
             onChange={(e) => setMeta({ ...meta, resident_code: e.target.value })}
             placeholder="用紙に記載があれば" />
         </div>
+        {hasPriorRound && (
+          <div className="dz-field">
+            <label htmlFor="pe-pra">前回への回答</label>
+            <select id="pe-pra" value={meta.prior_round_answered ?? ""}
+              onChange={(e) => setMeta({ ...meta, prior_round_answered: e.target.value })}>
+              <option value="">—</option>
+              <option>回答した</option>
+              <option>回答していない</option>
+              <option>わからない</option>
+            </select>
+          </div>
+        )}
         <div className="dz-field">
           <label htmlFor="pe-mt">立場</label>
           <select id="pe-mt" value={meta.member_type ?? "住民"}

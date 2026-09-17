@@ -186,13 +186,41 @@ export async function getRoundSummaries(associationId) {
   const [{ data, error }, { data: codes, error: e2 }] = await Promise.all([
     supabase.from("v_round_summary").select("*")
       .eq("association_id", associationId).order("sequence"),
-    supabase.from("survey_rounds").select("id,access_code")
-      .eq("association_id", associationId),
+    selectWithOptional(
+      "survey_rounds", ["id", "access_code"], ["show_resident_code"],
+      (q) => q.eq("association_id", associationId)),
   ]);
   if (error) throw error;
   if (e2) throw e2;
-  const byId = Object.fromEntries((codes ?? []).map((c) => [c.id, c.access_code]));
-  return (data ?? []).map((r) => ({ ...r, access_code: byId[r.round_id] ?? null }));
+  const byId = Object.fromEntries((codes ?? []).map((c) => [c.id, c]));
+  return (data ?? []).map((r) => ({
+    ...r,
+    access_code: byId[r.round_id]?.access_code ?? null,
+    show_resident_code: byId[r.round_id]?.show_resident_code ?? false,
+  }));
+}
+
+/**
+ * あとから足した列を、まだSQLを流していない環境でも安全に読むための受け皿。
+ *
+ * 新しい列を select に書くと、列が無い環境では問い合わせ全体が失敗し、
+ * 画面がまるごと真っ白になります。それでは原因も分かりません。
+ * ここでは、失敗した理由が「その列が無い」ことだった場合にかぎり、
+ * 新しい列を外してもう一度読み直します。
+ * SQLを流したあとは、そのまま新しい列も読めます。
+ */
+export async function selectWithOptional(table, baseCols, optionalCols, refine) {
+  const ask = (cols) => {
+    const q = supabase.from(table).select(cols.join(","));
+    return refine ? refine(q) : q;
+  };
+
+  const res = await ask([...baseCols, ...optionalCols]);
+  const msg = res.error?.message ?? "";
+  if (res.error && optionalCols.some((c) => msg.includes(c))) {
+    return ask(baseCols);
+  }
+  return res;
 }
 
 /** 指定した調査回の項目別平均（40件） */
@@ -336,10 +364,21 @@ export async function updateAssociation(associationId, patch) {
 
 /** 紙で回答された分の代理入力（管理者権限で直接insert） */
 export async function enterPaperResponse({ roundId, meta, answers }) {
-  const { data: r, error: e1 } = await supabase
-    .from("respondents")
-    .insert({ round_id: roundId, entry_mode: "paper", ...meta })
-    .select("id").single();
+  const payload = { round_id: roundId, entry_mode: "paper", ...meta };
+
+  const add = (body) => supabase.from("respondents").insert(body).select("id").single();
+
+  let { data: r, error: e1 } = await add(payload);
+
+  /*
+   * 「前回の調査に回答したか」は、あとから足した項目です。
+   * まだSQLを流していない環境では、その項目のせいで登録できません。
+   * 入力し終えたものを無駄にしないよう、その項目だけ外して登録し直します。
+   */
+  if (e1 && (e1.message ?? "").includes("prior_round_answered")) {
+    const { prior_round_answered, ...rest } = payload;
+    ({ data: r, error: e1 } = await add(rest));
+  }
   if (e1) throw e1;
 
   const { error: e2 } = await supabase

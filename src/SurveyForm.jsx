@@ -21,7 +21,7 @@
  *   そのまま同じ調査回に回答できます。
  */
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase, beginPrintScope, endPrintScope } from "./lib/bosai-supabase-api";
+import { supabase, beginPrintScope, endPrintScope, updateRound } from "./lib/bosai-supabase-api";
 import { QrImage } from "./QrCode";
 
 const AGES = ["20代", "30代", "40代", "50代", "60代", "70代", "80代以上"];
@@ -72,7 +72,8 @@ function Line({ w = "100%" }) {
 /* ============================================================
    用紙の中身
    ============================================================ */
-function Form({ association, round, master, url, noteSet }) {
+function Form({ association, round, master, url, noteSet, hasPriorRound }) {
+  const showCode = Boolean(round?.show_resident_code);
   const hasNote = (section, no) => noteSet.has(`${section}-${no}`);
 
   const shodouChoice = (master.shodou ?? []).filter((it) => it.input_type !== "quiz5");
@@ -129,17 +130,43 @@ function Form({ association, round, master, url, noteSet }) {
         <h2>回答者について</h2>
         <table className="sf-table sf-meta">
           <tbody>
-            <tr>
-              <th>回答番号</th>
-              <td>
-                <Line w="34mm" />
-                <span className="sf-hint">自治会からお配りした番号があればご記入ください</span>
-              </td>
-              <th>立場</th>
-              <td>
-                {MEMBER.map((m, i) => <Opt key={m} n={i + 1} label={m} />)}
-              </td>
-            </tr>
+            {/*
+              * 前回の調査に回答されたかどうか。
+              * 第2回以降の用紙にだけ入ります。
+              * 集計で「続けて答えてくださった方」を取り出すのに使います。
+              */}
+            {hasPriorRound && (
+              <tr>
+                <th>{round?.prior_round_label ? `${round.prior_round_label}への回答` : "前回への回答"}</th>
+                <td colSpan={3}>
+                  <Opt n={1} label="回答した" />
+                  <Opt n={2} label="回答していない" />
+                  <Opt n={3} label="覚えていない" />
+                </td>
+              </tr>
+            )}
+
+            {/* 回答番号は、番号を配る調査のときだけ印刷します */}
+            {showCode ? (
+              <tr>
+                <th>回答番号</th>
+                <td>
+                  <Line w="34mm" />
+                  <span className="sf-hint">自治会からお配りした番号をご記入ください</span>
+                </td>
+                <th>立場</th>
+                <td>
+                  {MEMBER.map((m, i) => <Opt key={m} n={i + 1} label={m} />)}
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <th>立場</th>
+                <td colSpan={3}>
+                  {MEMBER.map((m, i) => <Opt key={m} n={i + 1} label={m} />)}
+                </td>
+              </tr>
+            )}
             <tr>
               <th>年齢</th>
               <td colSpan={3}>
@@ -297,8 +324,9 @@ function Form({ association, round, master, url, noteSet }) {
 /* ============================================================
    本体
    ============================================================ */
-export default function SurveyForm({ association, rounds, master }) {
+export default function SurveyForm({ association, rounds, master, onChanged }) {
   const [open, setOpen] = useState(false);
+  const [codeBusy, setCodeBusy] = useState(false);
   const [roundId, setRoundId] = useState("");
   const [noteSet, setNoteSet] = useState(null);
 
@@ -377,6 +405,37 @@ export default function SurveyForm({ association, rounds, master }) {
     [rounds, roundId]
   );
 
+  /*
+   * ひとつ前の調査回。
+   * これがあれば第2回以降なので、
+   * 用紙に「前回への回答」の欄を入れます。
+   */
+  const priorRound = useMemo(() => {
+    if (!round) return null;
+    return (rounds ?? [])
+      .filter((r) => (r.sequence ?? 0) < (round.sequence ?? 0))
+      .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+      .pop() ?? null;
+  }, [rounds, round]);
+
+  /* 用紙に刷るための情報をひとまとめにする */
+  const formRound = useMemo(
+    () => (round ? { ...round, prior_round_label: priorRound?.label ?? null } : null),
+    [round, priorRound]
+  );
+
+  /* 用紙に回答番号の欄を入れるかどうかを切り替える */
+  const toggleCode = async (next) => {
+    if (!round) return;
+    setCodeBusy(true);
+    try {
+      await updateRound(round.round_id, { show_resident_code: next });
+      onChanged?.();
+    } catch {
+      /* 保存できなくても用紙は出せるので、ここでは止めない */
+    } finally { setCodeBusy(false); }
+  };
+
   const url = useMemo(() => {
     if (!round?.access_code) return "";
     const base = `${window.location.origin}${window.location.pathname.replace(/admin\.html$/, "")}`;
@@ -414,6 +473,27 @@ export default function SurveyForm({ association, rounds, master }) {
         </button>
       </div>
 
+      <label className="sf-opt-code">
+        <input type="checkbox" disabled={!round || codeBusy}
+          checked={Boolean(round?.show_resident_code)}
+          onChange={(e) => toggleCode(e.target.checked)} />
+        <span>
+          <b>用紙に「回答番号」の記入欄を入れる</b>
+          <i>
+            番号を配らない調査では、空欄があると何を書くのか迷わせてしまいます。
+            通常は外したままで構いません。設定は調査回ごとに残ります。
+          </i>
+        </span>
+      </label>
+
+      {priorRound && (
+        <p className="dz-note">
+          この調査回には前の回（{priorRound.label}）があるため、用紙の先頭に
+          「{priorRound.label}への回答」をうかがう欄が入ります。
+          回答画面にも同じ質問が出ます。
+        </p>
+      )}
+
       {round && !round.access_code && (
         <p className="dz-note">
           この調査回には合言葉が設定されていないため、QRコードは入りません。
@@ -434,8 +514,8 @@ export default function SurveyForm({ association, rounds, master }) {
           </div>
 
           <div className="sf-stage">
-            <Form association={association} round={round} master={master ?? { koudou: [], shodou: [] }}
-              url={url} noteSet={noteSet ?? new Set()} />
+            <Form association={association} round={formRound} master={master ?? { koudou: [], shodou: [] }}
+              url={url} noteSet={noteSet ?? new Set()} hasPriorRound={Boolean(priorRound)} />
           </div>
 
           <p className="sf-tip">
@@ -456,6 +536,13 @@ export default function SurveyForm({ association, rounds, master }) {
    画面表示用のスタイル
    ============================================================ */
 const SF_CSS = `
+.sf-opt-code{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:12px 14px;
+ background:var(--paper);border-radius:8px;cursor:pointer;}
+.sf-opt-code input{margin-top:3px;width:17px;height:17px;flex:none;cursor:pointer;}
+.sf-opt-code b{display:block;font-size:14px;}
+.sf-opt-code i{display:block;font-style:normal;font-size:12px;color:var(--sub);margin-top:3px;
+ line-height:1.6;}
+
 .sf-overlay{position:fixed;inset:0;z-index:900;background:#26304a;
  display:flex;flex-direction:column;align-items:center;overflow:auto;padding-bottom:28px;}
 .sf-bar-top{position:sticky;top:0;z-index:2;width:100%;background:#12274a;color:#fff;

@@ -12,7 +12,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Legend, Tooltip,
 } from "recharts";
-import { supabase, printElement } from "./lib/bosai-supabase-api";
+import { supabase, printElement, selectWithOptional } from "./lib/bosai-supabase-api";
 import RespondentEdit from "./RespondentEdit";
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -21,11 +21,13 @@ const sum = (a) => a.reduce((x, y) => x + y, 0);
 /* ---------- データ取得 ---------- */
 async function fetchRoster(roundId) {
   const [{ data: people, error: e1 }, { data: totals, error: e2 }] = await Promise.all([
-    supabase.from("respondents")
-      .select("id,resident_code,member_type,age_band,sex,household_size,residence_years," +
-              "entry_mode,submitted_at," +
-              "certifications,job_constraint,health_constraint,learning_interest")
-      .eq("round_id", roundId),
+    selectWithOptional(
+      "respondents",
+      ["id", "resident_code", "member_type", "age_band", "sex", "household_size",
+       "residence_years", "entry_mode", "submitted_at",
+       "certifications", "job_constraint", "health_constraint", "learning_interest"],
+      ["prior_round_answered"],
+      (q) => q.eq("round_id", roundId)),
     supabase.from("v_respondent_totals")
       .select("respondent_id,koudou_total,shodou_total,grand_total")
       .eq("round_id", roundId),
@@ -150,7 +152,8 @@ function Card({ person, answers, master, areaAvg, onClose, onPrev, onNext, onEdi
   );
 
   const attrs = [
-    ["立場", person.member_type], ["年齢", person.age_band], ["性別", person.sex],
+    ["立場", person.member_type], ["前回への回答", person.prior_round_answered],
+    ["年齢", person.age_band], ["性別", person.sex],
     ["世帯人数", person.household_size], ["居住年数", person.residence_years],
     ["入力方法", person.entry_mode === "paper" ? "紙（代理入力）" : "Web"],
   ].filter(([, v]) => v);

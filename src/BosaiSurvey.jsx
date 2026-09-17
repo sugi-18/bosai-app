@@ -239,6 +239,7 @@ export default function BosaiSurvey() {
 
   const [meta, setMeta] = useState({
     resident_code: "",
+    prior_round_answered: "",
     member_type: "住民",
     age_band: "",
     sex: "",
@@ -1266,6 +1267,77 @@ export default function BosaiSurvey() {
               )}
 
             </div>
+
+
+            {/*
+              * 第2回以降の調査でだけ表示します。
+              * 回答番号を配らない調査が多いため、
+              * ご本人の申告で「続けて答えてくださった方」を
+              * 取り出せるようにするための項目です。
+              */}
+            {round?.prior_round_exists && (
+
+              <div
+                className="bs-field"
+                style={{
+                  marginTop: 16,
+                  maxWidth: 340,
+                }}
+              >
+
+                <label htmlFor="pra">
+                  {round.prior_round_label
+                    ? `${round.prior_round_label}のアンケートに回答されましたか`
+                    : "前回のアンケートに回答されましたか"}
+                </label>
+
+
+                <select
+                  id="pra"
+                  value={meta.prior_round_answered}
+                  onChange={(e) =>
+                    setMeta({
+                      ...meta,
+                      prior_round_answered:
+                        e.target.value,
+                    })
+                  }
+                >
+
+                  <option value="">
+                    選んでください
+                  </option>
+
+                  <option value="回答した">
+                    回答した
+                  </option>
+
+                  <option value="回答していない">
+                    回答していない
+                  </option>
+
+                  <option value="わからない">
+                    覚えていない
+                  </option>
+
+                </select>
+
+
+                <p
+                  className="bs-muted"
+                  style={{ marginTop: 6 }}
+                >
+
+                  続けて答えてくださった方の変化を
+                  見るためにうかがっています。
+                  はっきり思い出せないときは
+                  「覚えていない」で構いません。
+
+                </p>
+
+              </div>
+
+            )}
 
 
             <div

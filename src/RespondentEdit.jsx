@@ -18,6 +18,7 @@ const SEX = ["男性", "女性", "その他"];
 const HOUSE = ["単身", "2人", "3人", "4人", "5人", "6人", "7人以上"];
 const RESIDENCE = ["1年未満", "1〜4年", "5〜9年", "10〜19年", "20年以上"];
 const MEMBER = ["住民", "役員・区長", "その他"];
+const PRIOR = ["回答した", "回答していない", "わからない"];
 
 const key = (sec, no) => `${sec}-${no}`;
 
@@ -48,6 +49,7 @@ export default function RespondentEdit({ person, answers, master, onSaved, onClo
     sex: person.sex ?? "",
     household_size: person.household_size ?? "",
     residence_years: person.residence_years ?? "",
+    prior_round_answered: person.prior_round_answered ?? "",
     certifications: person.certifications ?? "",
     job_constraint: person.job_constraint ?? "",
     health_constraint: person.health_constraint ?? "",
@@ -77,6 +79,7 @@ export default function RespondentEdit({ person, answers, master, onSaved, onClo
         sex: meta.sex || null,
         household_size: meta.household_size || null,
         residence_years: meta.residence_years || null,
+        prior_round_answered: meta.prior_round_answered || null,
         certifications: meta.certifications.trim() || null,
         job_constraint: meta.job_constraint.trim() || null,
         health_constraint: meta.health_constraint.trim() || null,
@@ -154,6 +157,8 @@ export default function RespondentEdit({ person, answers, master, onSaved, onClo
             onChange={(v) => setMeta({ ...meta, household_size: v })} />
           <Sel id="re-ry" label="居住年数" value={meta.residence_years} options={RESIDENCE}
             onChange={(v) => setMeta({ ...meta, residence_years: v })} />
+          <Sel id="re-pra" label="前回への回答" value={meta.prior_round_answered} options={PRIOR}
+            onChange={(v) => setMeta({ ...meta, prior_round_answered: v })} />
         </div>
 
         <div className="re-grid" style={{ marginTop: 14 }}>

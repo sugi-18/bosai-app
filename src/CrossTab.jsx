@@ -12,7 +12,7 @@
  *       （v_respondent_attributes ビューを使います）
  */
 import React, { useState, useEffect, useMemo } from "react";
-import { supabase } from "./lib/bosai-supabase-api";
+import { supabase, selectWithOptional } from "./lib/bosai-supabase-api";
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const fmtDelta = (d) => (d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1));
@@ -30,6 +30,13 @@ const AXES = [
   { key: "household_size",  label: "世帯人数", order: ["単身", "2人", "3人", "4人", "5人", "6人", "7人以上"] },
   { key: "residence_years", label: "居住年数", order: ["1年未満", "1〜4年", "5〜9年", "10〜19年", "20年以上"] },
   { key: "sex",             label: "性別",     order: ["男性", "女性", "その他"] },
+  /*
+   * 第2回以降の調査でだけ中身が入ります。
+   * 「回答した」を選んだ層だけを見れば、
+   * 続けて答えてくださった方の変化が分かります。
+   */
+  { key: "prior_round_answered", label: "前回への回答",
+    order: ["回答した", "回答していない", "わからない"] },
 ];
 
 const METRICS = [
@@ -42,11 +49,12 @@ const METRICS = [
    データ取得
    ------------------------------------------------------------ */
 async function fetchPeople(roundId) {
-  const { data, error } = await supabase
-    .from("v_respondent_attributes")
-    .select("respondent_id,member_type,age_band,sex,household_size,residence_years," +
-            "koudou_total,shodou_total,grand_total")
-    .eq("round_id", roundId);
+  const { data, error } = await selectWithOptional(
+    "v_respondent_attributes",
+    ["respondent_id", "member_type", "age_band", "sex", "household_size",
+     "residence_years", "koudou_total", "shodou_total", "grand_total"],
+    ["prior_round_answered"],
+    (q) => q.eq("round_id", roundId));
   if (error) throw error;
   return data ?? [];
 }
@@ -83,6 +91,18 @@ export default function CrossTab({ roundId, roundLabel, master }) {
   const [hideSmall, setHideSmall] = useState(false);
 
   const axis = AXES.find((a) => a.key === axisKey);
+
+  /*
+   * 選べる軸。
+   * 「前回への回答」は第2回以降の調査でしか中身が入らないため、
+   * 誰も答えていない調査回では出しません。
+   * 全員が「未記入」の表を見せても、判断の助けにならないためです。
+   */
+  const axes = useMemo(
+    () => AXES.filter((a) => a.key !== "prior_round_answered"
+      || people.some((x) => (x.prior_round_answered ?? "").trim() !== "")),
+    [people]
+  );
   const metric = METRICS.find((m) => m.key === metricKey);
 
   useEffect(() => {
@@ -102,6 +122,11 @@ export default function CrossTab({ roundId, roundLabel, master }) {
   }, [roundId]);
 
   /* ---- 層の一覧（人数の多い順ではなく、意味のある順に固定） ---- */
+  /* 選べなくなった軸が選ばれたままにならないようにする */
+  useEffect(() => {
+    if (axes.length && !axes.some((a) => a.key === axisKey)) setAxisKey(axes[0].key);
+  }, [axes, axisKey]);
+
   const segments = useMemo(() => {
     if (people.length === 0) return [];
     const seen = new Map();
@@ -230,7 +255,7 @@ export default function CrossTab({ roundId, roundLabel, master }) {
             <div className="ct-ctl">
               <label htmlFor="ct-axis">分ける軸</label>
               <select id="ct-axis" value={axisKey} onChange={(e) => setAxisKey(e.target.value)}>
-                {AXES.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+                {axes.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
               </select>
             </div>
             <div className="ct-ctl">

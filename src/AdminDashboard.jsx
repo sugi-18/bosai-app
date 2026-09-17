@@ -889,7 +889,8 @@ from associations a where a.name = '〇〇自治会';`}</pre>
           　<RespondentCards roundId={cmpId} roundLabel={cmpRound?.label} master={master}
             areaAvg={cmpAvg} onChanged={loadRounds} />
             <FreeTextPanel roundId={cmpId} roundLabel={cmpRound?.label} />
-            <SurveyForm association={association} rounds={rounds} master={master} />
+            <SurveyForm association={association} rounds={rounds} master={master}
+              onChanged={loadRounds} />
             <PaperEntry association={association} rounds={rounds} master={master} onSaved={loadRounds} />
             <AssociationManager association={association} onChanged={loadBase} />
 
